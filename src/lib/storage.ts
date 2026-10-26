@@ -1,7 +1,33 @@
-import { CardValidityStatus, GymDatabase, WorkoutCard } from "@/types/gym";
+import { AuthSession, CardValidityStatus, GymDatabase, WorkoutCard } from "@/types/gym";
 import { INITIAL_GYM_DATA } from "./initialData";
 
 const STORAGE_KEY = "palestra_schede_db_v1";
+const AUTH_STORAGE_KEY = "palestra_auth_session_v1";
+
+export function loadAuthSession(): AuthSession | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(AUTH_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as AuthSession;
+    if (!parsed || (parsed.role !== "trainer" && parsed.role !== "athlete")) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export function saveAuthSession(session: AuthSession): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
+}
+
+export function clearAuthSession(): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(AUTH_STORAGE_KEY);
+}
 
 export function loadGymDatabase(): GymDatabase {
   if (typeof window === "undefined") {

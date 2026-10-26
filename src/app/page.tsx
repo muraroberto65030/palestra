@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Athlete,
+  AuthSession,
   CardValidityStatus,
   GymDatabase,
   UserRole,
@@ -10,10 +11,13 @@ import {
   WorkoutSessionLog,
 } from "@/types/gym";
 import {
+  clearAuthSession,
   formatItalianDate,
   getCardStatus,
+  loadAuthSession,
   loadGymDatabase,
   resetToInitialDatabase,
+  saveAuthSession,
   saveGymDatabase,
 } from "@/lib/storage";
 import AthleteModal from "@/components/AthleteModal";
@@ -21,6 +25,7 @@ import CardModal from "@/components/CardModal";
 import OriginalSheetModal from "@/components/OriginalSheetModal";
 import WorkoutPlanEditorModal from "@/components/WorkoutPlanEditorModal";
 import DailyWorkoutTracker from "@/components/DailyWorkoutTracker";
+import LoginScreen from "@/components/LoginScreen";
 import {
   Dumbbell,
   Users,
@@ -46,11 +51,13 @@ import {
   Mail,
   Settings2,
   Play,
+  LogOut,
 } from "lucide-react";
 
 export default function GymHomePage() {
   const [db, setDb] = useState<GymDatabase | null>(null);
-  const [role, setRole] = useState<UserRole>("athlete"); // Mostriamo subito la compilazione o lasciamo switch rapido
+  const [authSession, setAuthSession] = useState<AuthSession | null>(null);
+  const [role, setRole] = useState<UserRole>("athlete");
 
   // Trainer state
   const [selectedAthleteFilter, setSelectedAthleteFilter] =
@@ -84,7 +91,37 @@ export default function GymHomePage() {
   useEffect(() => {
     const loaded = loadGymDatabase();
     setDb(loaded);
+    const savedAuth = loadAuthSession();
+    if (savedAuth) {
+      setAuthSession(savedAuth);
+      setRole(savedAuth.role);
+      if (savedAuth.role === "athlete" && savedAuth.athleteId) {
+        setActiveAthleteId(savedAuth.athleteId);
+        const firstCard = loaded.cards.find(
+          (c) => c.athleteId === savedAuth.athleteId && !c.archived
+        );
+        setActiveCardIdForWorkout(firstCard?.id || null);
+      }
+    }
   }, []);
+
+  const handleLogin = (session: AuthSession) => {
+    saveAuthSession(session);
+    setAuthSession(session);
+    setRole(session.role);
+    if (session.role === "athlete" && session.athleteId && db) {
+      setActiveAthleteId(session.athleteId);
+      const firstCard = db.cards.find(
+        (c) => c.athleteId === session.athleteId && !c.archived
+      );
+      setActiveCardIdForWorkout(firstCard?.id || null);
+    }
+  };
+
+  const handleLogout = () => {
+    clearAuthSession();
+    setAuthSession(null);
+  };
 
   const persistDb = (nextDb: GymDatabase) => {
     setDb(nextDb);
@@ -395,6 +432,13 @@ export default function GymHomePage() {
     );
   }
 
+  // Se non c'è una sessione di login attiva, mostra la schermata di Login con spunta Trainer / Atleta
+  if (!authSession) {
+    return <LoginScreen athletes={db.athletes} onLogin={handleLogin} />;
+  }
+
+  const isTrainerLoggedIn = authSession.role === "trainer";
+
   const getBadgeStyle = (status: CardValidityStatus) => {
     switch (status) {
       case "active":
@@ -410,8 +454,12 @@ export default function GymHomePage() {
     }
   };
 
+  const effectiveAthleteId = isTrainerLoggedIn
+    ? activeAthleteId
+    : authSession.athleteId || activeAthleteId;
+
   const currentAthlete =
-    db.athletes.find((a) => a.id === activeAthleteId) || db.athletes[0];
+    db.athletes.find((a) => a.id === effectiveAthleteId) || db.athletes[0];
   const currentAthleteCards = db.cards.filter(
     (c) => c.athleteId === currentAthlete?.id
   );
@@ -437,8 +485,10 @@ export default function GymHomePage() {
                 <h1 className="text-lg font-extrabold tracking-tight text-white">
                   GymCard <span className="text-amber-400">Pro</span>
                 </h1>
-                <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-300">
-                  Auto-Save +/- Attivo
+                <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-amber-300">
+                  {isTrainerLoggedIn
+                    ? "Accesso Trainer"
+                    : `Atleta: ${authSession.displayName}`}
                 </span>
               </div>
               <p className="text-xs text-slate-400">
@@ -448,32 +498,34 @@ export default function GymHomePage() {
             </div>
           </div>
 
-          {/* Switch Modalità Compilazione Atleta / Gestione Trainer + Azioni */}
+          {/* Azioni + Switch vista (se Trainer) + Logout */}
           <div className="flex flex-wrap items-center gap-2.5">
-            <div className="flex rounded-xl border border-slate-800 bg-slate-900 p-1">
-              <button
-                onClick={() => setRole("athlete")}
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                  role === "athlete"
-                    ? "bg-amber-500 text-slate-950 shadow"
-                    : "text-slate-400 hover:text-white"
-                }`}
-              >
-                <UserCheck className="h-3.5 w-3.5" />
-                Compilazione Allenamento (+/-)
-              </button>
-              <button
-                onClick={() => setRole("trainer")}
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                  role === "trainer"
-                    ? "bg-amber-500 text-slate-950 shadow"
-                    : "text-slate-400 hover:text-white"
-                }`}
-              >
-                <Shield className="h-3.5 w-3.5" />
-                Gestione Utenti &amp; Schede
-              </button>
-            </div>
+            {isTrainerLoggedIn && (
+              <div className="flex rounded-xl border border-slate-800 bg-slate-900 p-1">
+                <button
+                  onClick={() => setRole("trainer")}
+                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                    role === "trainer"
+                      ? "bg-amber-500 text-slate-950 shadow"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  <Shield className="h-3.5 w-3.5" />
+                  Gestione Utenti &amp; Schede
+                </button>
+                <button
+                  onClick={() => setRole("athlete")}
+                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                    role === "athlete"
+                      ? "bg-amber-500 text-slate-950 shadow"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  <UserCheck className="h-3.5 w-3.5" />
+                  Compilazione (+/-)
+                </button>
+              </div>
+            )}
 
             <button
               onClick={() => setOriginalSheetOpen(true)}
@@ -484,42 +536,56 @@ export default function GymHomePage() {
               <span className="hidden sm:inline">Scheda Cartacea</span>
             </button>
 
-            <button
-              onClick={handleExportJson}
-              className="flex items-center gap-1 rounded-xl border border-slate-800 bg-slate-900 px-2.5 py-2 text-xs font-medium text-slate-300 hover:bg-slate-800"
-              title="Esporta Backup JSON"
-            >
-              <Download className="h-4 w-4" />
-            </button>
+            {isTrainerLoggedIn && (
+              <>
+                <button
+                  onClick={handleExportJson}
+                  className="flex items-center gap-1 rounded-xl border border-slate-800 bg-slate-900 px-2.5 py-2 text-xs font-medium text-slate-300 hover:bg-slate-800"
+                  title="Esporta Backup JSON"
+                >
+                  <Download className="h-4 w-4" />
+                </button>
 
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-1 rounded-xl border border-slate-800 bg-slate-900 px-2.5 py-2 text-xs font-medium text-slate-300 hover:bg-slate-800"
-              title="Importa Backup JSON"
-            >
-              <Upload className="h-4 w-4" />
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="application/json"
-              onChange={handleImportJson}
-              className="hidden"
-            />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-1 rounded-xl border border-slate-800 bg-slate-900 px-2.5 py-2 text-xs font-medium text-slate-300 hover:bg-slate-800"
+                  title="Importa Backup JSON"
+                >
+                  <Upload className="h-4 w-4" />
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="application/json"
+                  onChange={handleImportJson}
+                  className="hidden"
+                />
 
+                <button
+                  onClick={handleResetDemo}
+                  className="flex items-center gap-1 rounded-xl border border-slate-800 bg-slate-900 px-2.5 py-2 text-xs font-medium text-slate-400 hover:bg-slate-800 hover:text-white"
+                  title="Ripristina dati demo iniziali"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </button>
+              </>
+            )}
+
+            {/* Pulsante Logout */}
             <button
-              onClick={handleResetDemo}
-              className="flex items-center gap-1 rounded-xl border border-slate-800 bg-slate-900 px-2.5 py-2 text-xs font-medium text-slate-400 hover:bg-slate-800 hover:text-white"
-              title="Ripristina dati demo iniziali"
+              onClick={handleLogout}
+              className="flex items-center gap-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs font-bold text-rose-300 transition hover:bg-rose-500/20"
+              title="Esci dalla sessione corrente"
             >
-              <RotateCcw className="h-4 w-4" />
+              <LogOut className="h-4 w-4" />
+              <span>Logout</span>
             </button>
           </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
-        {role === "trainer" ? (
+        {isTrainerLoggedIn && role === "trainer" ? (
           <>
             {/* KPI Row */}
             <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -1070,84 +1136,85 @@ export default function GymHomePage() {
             </div>
           </>
         ) : (
-          /* MODALITÀ COMPILAZIONE GIORNALIERA (ATLETA / SALA PESI) */
+          /* MODALITÀ COMPILAZIONE GIORNALIERA (ATLETA LOGGATO O TRAINER IN VISTA COMPILAZIONE) */
           <div className="space-y-5">
-            {/* Barra selezione Utente e Scheda */}
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 sm:p-5">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <span className="text-xs font-semibold uppercase tracking-wider text-amber-400">
-                    Sala Pesi — Compilazione Rapida (Zero pulsante Salva)
-                  </span>
-                  <h2 className="mt-0.5 text-lg font-extrabold text-white">
-                    Seleziona Atleta e Scheda
-                  </h2>
-                </div>
+            {/* Se è il Trainer in vista compilazione, può cambiare atleta; se è l'Atleta, vede solo le proprie schede */}
+            {isTrainerLoggedIn && (
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 sm:p-5">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <span className="text-xs font-semibold uppercase tracking-wider text-amber-400">
+                      Modalità Trainer — Compilazione Rapida
+                    </span>
+                    <h2 className="mt-0.5 text-lg font-extrabold text-white">
+                      Seleziona Atleta da Compilare
+                    </h2>
+                  </div>
 
-                {/* Scelta Utente */}
-                <div className="flex flex-wrap gap-2">
-                  {db.athletes
-                    .filter((a) => a.active)
-                    .map((ath) => {
-                      const isSelected = currentAthlete?.id === ath.id;
-                      return (
-                        <button
-                          key={ath.id}
-                          onClick={() => {
-                            setActiveAthleteId(ath.id);
-                            const firstCard = db.cards.find(
-                              (c) => c.athleteId === ath.id && !c.archived
-                            );
-                            if (firstCard) {
-                              setActiveCardIdForWorkout(firstCard.id);
-                            }
-                          }}
-                          className={`rounded-xl border px-4 py-2 text-sm font-bold transition ${
-                            isSelected
-                              ? "border-amber-500 bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20"
-                              : "border-slate-800 bg-slate-950 text-slate-300 hover:border-slate-700 hover:text-white"
-                          }`}
-                        >
-                          {ath.fullName}
-                        </button>
-                      );
-                    })}
+                  <div className="flex flex-wrap gap-2">
+                    {db.athletes
+                      .filter((a) => a.active)
+                      .map((ath) => {
+                        const isSelected = currentAthlete?.id === ath.id;
+                        return (
+                          <button
+                            key={ath.id}
+                            onClick={() => {
+                              setActiveAthleteId(ath.id);
+                              const firstCard = db.cards.find(
+                                (c) => c.athleteId === ath.id && !c.archived
+                              );
+                              if (firstCard) {
+                                setActiveCardIdForWorkout(firstCard.id);
+                              }
+                            }}
+                            className={`rounded-xl border px-4 py-2 text-sm font-bold transition ${
+                              isSelected
+                                ? "border-amber-500 bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20"
+                                : "border-slate-800 bg-slate-950 text-slate-300 hover:border-slate-700 hover:text-white"
+                            }`}
+                          >
+                            {ath.fullName}
+                          </button>
+                        );
+                      })}
+                  </div>
                 </div>
               </div>
+            )}
 
-              {/* Se l'utente ha più schede, permette di scegliere quale compilare */}
-              {currentAthleteCards.length > 1 && (
-                <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-800 pt-3">
-                  <span className="text-xs text-slate-400">
-                    Schede di {currentAthlete?.fullName}:
-                  </span>
-                  {currentAthleteCards.map((c) => {
-                    const st = getCardStatus(c);
-                    const isSelected = selectedWorkoutCard?.id === c.id;
-                    return (
-                      <button
-                        key={c.id}
-                        onClick={() => setActiveCardIdForWorkout(c.id)}
-                        className={`flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-bold transition ${
-                          isSelected
-                            ? "border-amber-500 bg-amber-500/15 text-amber-300"
-                            : "border-slate-800 bg-slate-950 text-slate-400 hover:text-white"
-                        }`}
+            {/* Se l'utente ha più schede, permette di scegliere quale compilare */}
+            {currentAthleteCards.length > 1 && (
+              <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+                <span className="text-xs font-semibold text-slate-400">
+                  Schede di {currentAthlete?.fullName}:
+                </span>
+                {currentAthleteCards.map((c) => {
+                  const st = getCardStatus(c);
+                  const isSelected = selectedWorkoutCard?.id === c.id;
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() => setActiveCardIdForWorkout(c.id)}
+                      className={`flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-bold transition ${
+                        isSelected
+                          ? "border-amber-500 bg-amber-500/15 text-amber-300"
+                          : "border-slate-800 bg-slate-950 text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      <span>{c.title}</span>
+                      <span
+                        className={`rounded-full border px-2 py-0.5 text-[10px] ${getBadgeStyle(
+                          st.status
+                        )}`}
                       >
-                        <span>{c.title}</span>
-                        <span
-                          className={`rounded-full border px-2 py-0.5 text-[10px] ${getBadgeStyle(
-                            st.status
-                          )}`}
-                        >
-                          {st.label}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+                        {st.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Componente Compilazione Giornaliera con + e - e Auto-Save */}
             {currentAthlete && selectedWorkoutCard ? (
@@ -1156,13 +1223,18 @@ export default function GymHomePage() {
                 card={selectedWorkoutCard}
                 logs={db.logs}
                 onAutoSaveLog={handleAutoSaveLog}
-                onDeleteSessionDate={handleDeleteSessionDate}
-                onOpenPlanEditor={(c) => setPlanEditorCardId(c.id)}
+                onDeleteSessionDate={
+                  isTrainerLoggedIn ? handleDeleteSessionDate : undefined
+                }
+                onOpenPlanEditor={
+                  isTrainerLoggedIn
+                    ? (c) => setPlanEditorCardId(c.id)
+                    : undefined
+                }
               />
             ) : (
               <div className="rounded-2xl border border-dashed border-slate-800 py-12 text-center text-sm text-slate-400">
-                Nessuna scheda disponibile per questo utente. Passa a{" "}
-                <strong>Gestione Utenti &amp; Schede</strong> per crearne una.
+                Nessuna scheda disponibile per questo utente.
               </div>
             )}
           </div>

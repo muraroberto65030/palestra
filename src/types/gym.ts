@@ -1,5 +1,12 @@
 export type UserRole = "trainer" | "athlete";
 
+export interface AuthSession {
+  role: UserRole;
+  athleteId?: string;
+  displayName: string;
+  loggedInAt: string;
+}
+
 export interface Athlete {
   id: string;
   fullName: string;
