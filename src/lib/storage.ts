@@ -1,8 +1,30 @@
-import { AuthSession, CardValidityStatus, GymDatabase, WorkoutCard } from "@/types/gym";
+import { AppTheme, AuthSession, CardValidityStatus, GymDatabase, WorkoutCard } from "@/types/gym";
 import { INITIAL_GYM_DATA } from "./initialData";
 
 const STORAGE_KEY = "palestra_schede_db_v1";
 const AUTH_STORAGE_KEY = "palestra_auth_session_v1";
+const THEME_STORAGE_KEY = "palestra_theme_v1";
+
+export function loadTheme(): AppTheme {
+  if (typeof window === "undefined") return "dark";
+  const raw = window.localStorage.getItem(THEME_STORAGE_KEY);
+  if (raw === "light" || raw === "metallic" || raw === "dark") {
+    return raw;
+  }
+  return "dark";
+}
+
+export function applyThemeToDocument(theme: AppTheme): void {
+  if (typeof document === "undefined") return;
+  document.documentElement.setAttribute("data-theme", theme);
+}
+
+export function saveTheme(theme: AppTheme): void {
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+  }
+  applyThemeToDocument(theme);
+}
 
 export function loadAuthSession(): AuthSession | null {
   if (typeof window === "undefined") return null;

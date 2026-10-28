@@ -66,7 +66,7 @@ export default function AthleteModal({
       <div className="w-full max-w-lg rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4">
           <h3 className="flex items-center gap-2 text-lg font-bold text-white">
-            <User className="h-5 w-5 text-amber-400" />
+            <User className="h-5 w-5 text-sky-400" />
             {initialAthlete ? "Modifica Utente (Atleta)" : "Nuovo Utente (Atleta)"}
           </h3>
           <button
@@ -88,7 +88,7 @@ export default function AthleteModal({
               placeholder="Es. Roberto Mura"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-amber-500 focus:outline-none"
+              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-sky-500 focus:outline-none"
             />
           </div>
 
@@ -102,7 +102,7 @@ export default function AthleteModal({
                 placeholder="Es. 340 1234567"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-amber-500 focus:outline-none"
+                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-sky-500 focus:outline-none"
               />
             </div>
 
@@ -116,7 +116,7 @@ export default function AthleteModal({
                 placeholder="Es. 1234"
                 value={pin}
                 onChange={(e) => setPin(e.target.value)}
-                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-amber-500 focus:outline-none"
+                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-sky-500 focus:outline-none"
               />
             </div>
           </div>
@@ -130,7 +130,7 @@ export default function AthleteModal({
               placeholder="nome@esempio.it"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-amber-500 focus:outline-none"
+              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-sky-500 focus:outline-none"
             />
           </div>
 
@@ -143,7 +143,7 @@ export default function AthleteModal({
               placeholder="Note sull'utente, infortuni pregressi, frequenza settimanale..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-amber-500 focus:outline-none"
+              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-sky-500 focus:outline-none"
             />
           </div>
 
@@ -158,7 +158,7 @@ export default function AthleteModal({
               type="checkbox"
               checked={active}
               onChange={(e) => setActive(e.target.checked)}
-              className="h-5 w-5 accent-amber-500"
+              className="h-5 w-5 accent-sky-500"
             />
           </div>
 
@@ -172,7 +172,7 @@ export default function AthleteModal({
             </button>
             <button
               type="submit"
-              className="rounded-xl bg-amber-500 px-5 py-2 text-sm font-semibold text-slate-950 hover:bg-amber-400"
+              className="rounded-xl bg-sky-500 px-5 py-2 text-sm font-semibold text-slate-950 hover:bg-sky-400"
             >
               {initialAthlete ? "Salva Modifiche" : "Crea Utente"}
             </button>

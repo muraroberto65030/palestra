@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  AppTheme,
   Athlete,
   AuthSession,
   CardValidityStatus,
@@ -11,14 +12,17 @@ import {
   WorkoutSessionLog,
 } from "@/types/gym";
 import {
+  applyThemeToDocument,
   clearAuthSession,
   formatItalianDate,
   getCardStatus,
   loadAuthSession,
   loadGymDatabase,
+  loadTheme,
   resetToInitialDatabase,
   saveAuthSession,
   saveGymDatabase,
+  saveTheme,
 } from "@/lib/storage";
 import AthleteModal from "@/components/AthleteModal";
 import CardModal from "@/components/CardModal";
@@ -52,12 +56,16 @@ import {
   Settings2,
   Play,
   LogOut,
+  Sun,
+  Moon,
+  Sparkle,
 } from "lucide-react";
 
 export default function GymHomePage() {
   const [db, setDb] = useState<GymDatabase | null>(null);
   const [authSession, setAuthSession] = useState<AuthSession | null>(null);
   const [role, setRole] = useState<UserRole>("athlete");
+  const [theme, setTheme] = useState<AppTheme>("dark");
 
   // Trainer state
   const [selectedAthleteFilter, setSelectedAthleteFilter] =
@@ -91,6 +99,9 @@ export default function GymHomePage() {
   useEffect(() => {
     const loaded = loadGymDatabase();
     setDb(loaded);
+    const savedTheme = loadTheme();
+    setTheme(savedTheme);
+    applyThemeToDocument(savedTheme);
     const savedAuth = loadAuthSession();
     if (savedAuth) {
       setAuthSession(savedAuth);
@@ -104,6 +115,11 @@ export default function GymHomePage() {
       }
     }
   }, []);
+
+  const handleChangeTheme = (nextTheme: AppTheme) => {
+    setTheme(nextTheme);
+    saveTheme(nextTheme);
+  };
 
   const handleLogin = (session: AuthSession) => {
     saveAuthSession(session);
@@ -434,7 +450,14 @@ export default function GymHomePage() {
 
   // Se non c'è una sessione di login attiva, mostra la schermata di Login con spunta Trainer / Atleta
   if (!authSession) {
-    return <LoginScreen athletes={db.athletes} onLogin={handleLogin} />;
+    return (
+      <LoginScreen
+        athletes={db.athletes}
+        theme={theme}
+        onChangeTheme={handleChangeTheme}
+        onLogin={handleLogin}
+      />
+    );
   }
 
   const isTrainerLoggedIn = authSession.role === "trainer";
@@ -477,15 +500,15 @@ export default function GymHomePage() {
       <header className="sticky top-0 z-30 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-3.5 sm:px-6">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-500 text-slate-950 shadow-lg shadow-sky-500/20">
               <Dumbbell className="h-6 w-6" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-lg font-extrabold tracking-tight text-white">
-                  GymCard <span className="text-amber-400">Pro</span>
+                  GymCard <span className="text-sky-400">Pro</span>
                 </h1>
-                <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-amber-300">
+                <span className="rounded-full border border-sky-500/30 bg-sky-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-sky-300">
                   {isTrainerLoggedIn
                     ? "Accesso Trainer"
                     : `Atleta: ${authSession.displayName}`}
@@ -506,7 +529,7 @@ export default function GymHomePage() {
                   onClick={() => setRole("trainer")}
                   className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
                     role === "trainer"
-                      ? "bg-amber-500 text-slate-950 shadow"
+                      ? "bg-sky-500 text-slate-950 shadow"
                       : "text-slate-400 hover:text-white"
                   }`}
                 >
@@ -517,7 +540,7 @@ export default function GymHomePage() {
                   onClick={() => setRole("athlete")}
                   className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
                     role === "athlete"
-                      ? "bg-amber-500 text-slate-950 shadow"
+                      ? "bg-sky-500 text-slate-950 shadow"
                       : "text-slate-400 hover:text-white"
                   }`}
                 >
@@ -527,12 +550,58 @@ export default function GymHomePage() {
               </div>
             )}
 
+            {/* Selettore rapido Tema nella barra superiore */}
+            <div
+              className="flex items-center rounded-xl border border-slate-800 bg-slate-900 p-1"
+              title="Cambia Tema (Scuro / Light / Grigio Metallizzato)"
+            >
+              <button
+                type="button"
+                onClick={() => handleChangeTheme("dark")}
+                className={`flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold transition ${
+                  theme === "dark"
+                    ? "bg-sky-500 text-slate-950 shadow"
+                    : "text-slate-400 hover:text-white"
+                }`}
+                title="Tema Scuro"
+              >
+                <Moon className="h-3.5 w-3.5" />
+                <span className="hidden md:inline">Scuro</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleChangeTheme("light")}
+                className={`flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold transition ${
+                  theme === "light"
+                    ? "bg-sky-500 text-slate-950 shadow"
+                    : "text-slate-400 hover:text-white"
+                }`}
+                title="Tema Light (Chiaro)"
+              >
+                <Sun className="h-3.5 w-3.5" />
+                <span className="hidden md:inline">Light</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleChangeTheme("metallic")}
+                className={`flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold transition ${
+                  theme === "metallic"
+                    ? "bg-sky-500 text-slate-950 shadow"
+                    : "text-slate-400 hover:text-white"
+                }`}
+                title="Tema Grigio Metallizzato"
+              >
+                <Sparkle className="h-3.5 w-3.5" />
+                <span className="hidden md:inline">Metallizzato</span>
+              </button>
+            </div>
+
             <button
               onClick={() => setOriginalSheetOpen(true)}
-              className="flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs font-medium text-slate-300 hover:border-amber-500/50 hover:text-amber-300"
+              className="flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs font-medium text-slate-300 hover:border-sky-500/50 hover:text-sky-300"
               title="Visualizza la foto della scheda cartacea di Roberto Mura"
             >
-              <FileImage className="h-4 w-4 text-amber-400" />
+              <FileImage className="h-4 w-4 text-sky-400" />
               <span className="hidden sm:inline">Scheda Cartacea</span>
             </button>
 
@@ -594,7 +663,7 @@ export default function GymHomePage() {
                   <span className="text-xs font-medium uppercase tracking-wider">
                     Utenti Attivi
                   </span>
-                  <Users className="h-4 w-4 text-amber-400" />
+                  <Users className="h-4 w-4 text-sky-400" />
                 </div>
                 <p className="mt-2 text-2xl font-extrabold text-white">
                   {kpis.activeAthletes}{" "}
@@ -621,9 +690,9 @@ export default function GymHomePage() {
                   <span className="text-xs font-medium uppercase tracking-wider">
                     In Scadenza / Scadute
                   </span>
-                  <AlertTriangle className="h-4 w-4 text-amber-400" />
+                  <AlertTriangle className="h-4 w-4 text-sky-400" />
                 </div>
-                <p className="mt-2 text-2xl font-extrabold text-amber-400">
+                <p className="mt-2 text-2xl font-extrabold text-sky-400">
                   {kpis.expiringOrExpired}
                 </p>
               </div>
@@ -649,7 +718,7 @@ export default function GymHomePage() {
                   <div className="mb-4 flex items-center justify-between gap-2">
                     <div>
                       <h2 className="flex items-center gap-2 text-base font-bold text-white">
-                        <Users className="h-5 w-5 text-amber-400" />
+                        <Users className="h-5 w-5 text-sky-400" />
                         Utenti Palestra ({filteredAthletes.length})
                       </h2>
                       <p className="text-xs text-slate-400">
@@ -661,7 +730,7 @@ export default function GymHomePage() {
                         setEditingAthlete(null);
                         setAthleteModalOpen(true);
                       }}
-                      className="flex items-center gap-1.5 rounded-xl bg-amber-500 px-3 py-2 text-xs font-bold text-slate-950 shadow hover:bg-amber-400"
+                      className="flex items-center gap-1.5 rounded-xl bg-sky-500 px-3 py-2 text-xs font-bold text-slate-950 shadow hover:bg-sky-400"
                     >
                       <Plus className="h-4 w-4" /> Nuovo Utente
                     </button>
@@ -676,7 +745,7 @@ export default function GymHomePage() {
                         placeholder="Cerca utente per nome o telefono..."
                         value={userSearch}
                         onChange={(e) => setUserSearch(e.target.value)}
-                        className="w-full rounded-xl border border-slate-800 bg-slate-950 py-2 pl-9 pr-3 text-xs text-white placeholder-slate-500 focus:border-amber-500 focus:outline-none"
+                        className="w-full rounded-xl border border-slate-800 bg-slate-950 py-2 pl-9 pr-3 text-xs text-white placeholder-slate-500 focus:border-sky-500 focus:outline-none"
                       />
                     </div>
                     <button
@@ -685,7 +754,7 @@ export default function GymHomePage() {
                       }
                       className={`rounded-xl border px-3 py-2 text-xs font-medium transition ${
                         showOnlyActiveUsers
-                          ? "border-amber-500/40 bg-amber-500/15 text-amber-300"
+                          ? "border-sky-500/40 bg-sky-500/15 text-sky-300"
                           : "border-slate-800 bg-slate-950 text-slate-400 hover:text-white"
                       }`}
                     >
@@ -698,7 +767,7 @@ export default function GymHomePage() {
                     onClick={() => setSelectedAthleteFilter("all")}
                     className={`mb-2.5 flex w-full items-center justify-between rounded-xl border px-3.5 py-2.5 text-left text-xs font-semibold transition ${
                       selectedAthleteFilter === "all"
-                        ? "border-amber-500/50 bg-amber-500/10 text-amber-300"
+                        ? "border-sky-500/50 bg-sky-500/10 text-sky-300"
                         : "border-slate-800/80 bg-slate-950/50 text-slate-400 hover:bg-slate-900 hover:text-white"
                     }`}
                   >
@@ -730,7 +799,7 @@ export default function GymHomePage() {
                           }
                           className={`group cursor-pointer rounded-xl border p-3.5 transition ${
                             isSelected
-                              ? "border-amber-500 bg-amber-500/10 shadow-md shadow-amber-500/5"
+                              ? "border-sky-500 bg-sky-500/10 shadow-md shadow-sky-500/5"
                               : "border-slate-800 bg-slate-950/70 hover:border-slate-700 hover:bg-slate-900"
                           }`}
                         >
@@ -772,7 +841,7 @@ export default function GymHomePage() {
                                   setSelectedAthleteFilter(athlete.id);
                                   setCardModalOpen(true);
                                 }}
-                                className="rounded-lg p-1.5 text-slate-400 hover:bg-amber-500/15 hover:text-amber-400"
+                                className="rounded-lg p-1.5 text-slate-400 hover:bg-sky-500/15 hover:text-sky-400"
                                 title="Nuova scheda per questo utente"
                               >
                                 <Plus className="h-4 w-4" />
@@ -843,7 +912,7 @@ export default function GymHomePage() {
                   <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <h2 className="flex items-center gap-2 text-base font-bold text-white">
-                        <ClipboardList className="h-5 w-5 text-amber-400" />
+                        <ClipboardList className="h-5 w-5 text-sky-400" />
                         Schede di Allenamento ({filteredCards.length})
                       </h2>
                       <p className="text-xs text-slate-400">
@@ -862,7 +931,7 @@ export default function GymHomePage() {
                         setEditingCard(null);
                         setCardModalOpen(true);
                       }}
-                      className="flex items-center gap-1.5 rounded-xl bg-amber-500 px-3.5 py-2 text-xs font-bold text-slate-950 shadow hover:bg-amber-400"
+                      className="flex items-center gap-1.5 rounded-xl bg-sky-500 px-3.5 py-2 text-xs font-bold text-slate-950 shadow hover:bg-sky-400"
                     >
                       <Plus className="h-4 w-4" /> Nuova Scheda
                     </button>
@@ -885,7 +954,7 @@ export default function GymHomePage() {
                         onClick={() => setStatusFilter(tab.id)}
                         className={`rounded-xl border px-3 py-1.5 text-xs font-medium transition ${
                           statusFilter === tab.id
-                            ? "border-amber-500 bg-amber-500/15 text-amber-300"
+                            ? "border-sky-500 bg-sky-500/15 text-sky-300"
                             : "border-slate-800 bg-slate-950 text-slate-400 hover:text-white"
                         }`}
                       >
@@ -914,7 +983,7 @@ export default function GymHomePage() {
                           <div className="flex flex-wrap items-start justify-between gap-3">
                             <div>
                               <div className="flex flex-wrap items-center gap-2">
-                                <span className="rounded-lg bg-slate-800 px-2.5 py-0.5 text-xs font-semibold text-amber-300">
+                                <span className="rounded-lg bg-slate-800 px-2.5 py-0.5 text-xs font-semibold text-sky-300">
                                   {athlete?.fullName || "Utente sconosciuto"}
                                 </span>
                                 <span
@@ -946,7 +1015,7 @@ export default function GymHomePage() {
                                   setActiveCardIdForWorkout(card.id);
                                   setRole("athlete");
                                 }}
-                                className="flex items-center gap-1 rounded-xl bg-amber-500 px-3 py-1.5 text-xs font-bold text-slate-950 hover:bg-amber-400"
+                                className="flex items-center gap-1 rounded-xl bg-sky-500 px-3 py-1.5 text-xs font-bold text-slate-950 hover:bg-sky-400"
                                 title="Vai alla compilazione giornaliera con + e -"
                               >
                                 <Play className="h-3.5 w-3.5" />
@@ -954,7 +1023,7 @@ export default function GymHomePage() {
                               </button>
                               <button
                                 onClick={() => setPlanEditorCardId(card.id)}
-                                className="flex items-center gap-1 rounded-xl border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs font-semibold text-amber-300 hover:border-amber-500/50"
+                                className="flex items-center gap-1 rounded-xl border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs font-semibold text-sky-300 hover:border-sky-500/50"
                                 title="Configura esercizi e Serie/Ripetizioni dei giorni"
                               >
                                 <Settings2 className="h-3.5 w-3.5" />
@@ -965,21 +1034,21 @@ export default function GymHomePage() {
                                   setEditingCard(card);
                                   setCardModalOpen(true);
                                 }}
-                                className="rounded-lg border border-slate-800 bg-slate-900 p-2 text-slate-300 hover:border-amber-500/50 hover:text-amber-400"
+                                className="rounded-lg border border-slate-800 bg-slate-900 p-2 text-slate-300 hover:border-sky-500/50 hover:text-sky-400"
                                 title="Modifica periodo e dati scheda"
                               >
                                 <Edit3 className="h-4 w-4" />
                               </button>
                               <button
                                 onClick={() => handleDuplicateCard(card)}
-                                className="rounded-lg border border-slate-800 bg-slate-900 p-2 text-slate-300 hover:border-amber-500/50 hover:text-amber-400"
+                                className="rounded-lg border border-slate-800 bg-slate-900 p-2 text-slate-300 hover:border-sky-500/50 hover:text-sky-400"
                                 title="Duplica / Rinnova scheda per nuovo periodo"
                               >
                                 <Copy className="h-4 w-4" />
                               </button>
                               <button
                                 onClick={() => handleToggleArchiveCard(card)}
-                                className="rounded-lg border border-slate-800 bg-slate-900 p-2 text-slate-300 hover:border-amber-500/50 hover:text-amber-400"
+                                className="rounded-lg border border-slate-800 bg-slate-900 p-2 text-slate-300 hover:border-sky-500/50 hover:text-sky-400"
                                 title={
                                   card.archived
                                     ? "Ripristina dall'archivio"
@@ -1001,7 +1070,7 @@ export default function GymHomePage() {
                           {/* Barra Validità & Statistiche */}
                           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-800/80 bg-slate-900/60 px-3.5 py-2 text-xs">
                             <span className="flex items-center gap-1.5 text-slate-300">
-                              <Calendar className="h-3.5 w-3.5 text-amber-400" />
+                              <Calendar className="h-3.5 w-3.5 text-sky-400" />
                               Validità:{" "}
                               <strong>
                                 {formatItalianDate(card.validFrom)}
@@ -1055,7 +1124,7 @@ export default function GymHomePage() {
                                     isExpanded ? null : card.id
                                   )
                                 }
-                                className="flex items-center gap-1 text-xs font-semibold text-amber-400 hover:text-amber-300"
+                                className="flex items-center gap-1 text-xs font-semibold text-sky-400 hover:text-sky-300"
                               >
                                 {isExpanded
                                   ? "Nascondi anteprima"
@@ -1076,7 +1145,7 @@ export default function GymHomePage() {
                                     className="rounded-xl border border-slate-800 bg-slate-900/90 p-3"
                                   >
                                     <div className="mb-2 flex items-center justify-between border-b border-slate-800 pb-1.5">
-                                      <span className="text-xs font-bold uppercase tracking-wider text-amber-400">
+                                      <span className="text-xs font-bold uppercase tracking-wider text-sky-400">
                                         {day.name}
                                       </span>
                                       <span className="text-[11px] text-slate-400">
@@ -1098,7 +1167,7 @@ export default function GymHomePage() {
                                             <span className="truncate">
                                               {ex.name}
                                             </span>
-                                            <span className="shrink-0 font-mono text-[11px] text-amber-300">
+                                            <span className="shrink-0 font-mono text-[11px] text-sky-300">
                                               {ex.setsReps || "-"}
                                             </span>
                                           </li>
@@ -1124,7 +1193,7 @@ export default function GymHomePage() {
                             setEditingCard(null);
                             setCardModalOpen(true);
                           }}
-                          className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-slate-950"
+                          className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-sky-500 px-4 py-2 text-xs font-bold text-slate-950"
                         >
                           <Plus className="h-4 w-4" /> Crea la prima scheda
                         </button>
@@ -1143,7 +1212,7 @@ export default function GymHomePage() {
               <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 sm:p-5">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div>
-                    <span className="text-xs font-semibold uppercase tracking-wider text-amber-400">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-sky-400">
                       Modalità Trainer — Compilazione Rapida
                     </span>
                     <h2 className="mt-0.5 text-lg font-extrabold text-white">
@@ -1170,7 +1239,7 @@ export default function GymHomePage() {
                             }}
                             className={`rounded-xl border px-4 py-2 text-sm font-bold transition ${
                               isSelected
-                                ? "border-amber-500 bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20"
+                                ? "border-sky-500 bg-sky-500 text-slate-950 shadow-lg shadow-sky-500/20"
                                 : "border-slate-800 bg-slate-950 text-slate-300 hover:border-slate-700 hover:text-white"
                             }`}
                           >
@@ -1198,7 +1267,7 @@ export default function GymHomePage() {
                       onClick={() => setActiveCardIdForWorkout(c.id)}
                       className={`flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-bold transition ${
                         isSelected
-                          ? "border-amber-500 bg-amber-500/15 text-amber-300"
+                          ? "border-sky-500 bg-sky-500/15 text-sky-300"
                           : "border-slate-800 bg-slate-950 text-slate-400 hover:text-white"
                       }`}
                     >
@@ -1222,6 +1291,8 @@ export default function GymHomePage() {
                 athlete={currentAthlete}
                 card={selectedWorkoutCard}
                 logs={db.logs}
+                theme={theme}
+                onChangeTheme={handleChangeTheme}
                 onAutoSaveLog={handleAutoSaveLog}
                 onDeleteSessionDate={
                   isTrainerLoggedIn ? handleDeleteSessionDate : undefined

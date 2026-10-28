@@ -16,7 +16,7 @@ export default function OriginalSheetModal({ isOpen, onClose }: OriginalSheetMod
       <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl">
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-800 bg-slate-900 px-6 py-4">
           <div className="flex items-center gap-2">
-            <FileImage className="h-5 w-5 text-amber-400" />
+            <FileImage className="h-5 w-5 text-sky-400" />
             <div>
               <h3 className="text-base font-bold text-white">
                 Scheda Cartacea Originale — Roberto Mura

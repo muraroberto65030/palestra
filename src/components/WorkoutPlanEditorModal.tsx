@@ -147,7 +147,7 @@ export default function WorkoutPlanEditorModal({
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 bg-slate-900 px-6 py-4">
           <div>
             <div className="flex items-center gap-2">
-              <Dumbbell className="h-5 w-5 text-amber-400" />
+              <Dumbbell className="h-5 w-5 text-sky-400" />
               <h3 className="text-lg font-bold text-white">
                 Piano di Allenamento — {card.title}
               </h3>
@@ -182,7 +182,7 @@ export default function WorkoutPlanEditorModal({
                 onClick={() => setActiveDayIdx(idx)}
                 className={`rounded-xl border px-3.5 py-1.5 text-xs font-bold transition ${
                   safeDayIdx === idx
-                    ? "border-amber-500 bg-amber-500 text-slate-950 shadow"
+                    ? "border-sky-500 bg-sky-500 text-slate-950 shadow"
                     : "border-slate-800 bg-slate-900 text-slate-300 hover:text-white"
                 }`}
               >
@@ -192,7 +192,7 @@ export default function WorkoutPlanEditorModal({
             ))}
             <button
               onClick={handleAddDay}
-              className="flex items-center gap-1 rounded-xl border border-dashed border-slate-700 bg-slate-900/50 px-3 py-1.5 text-xs font-semibold text-amber-400 hover:border-amber-500"
+              className="flex items-center gap-1 rounded-xl border border-dashed border-slate-700 bg-slate-900/50 px-3 py-1.5 text-xs font-semibold text-sky-400 hover:border-sky-500"
             >
               <Plus className="h-3.5 w-3.5" /> Aggiungi Giorno
             </button>
@@ -204,7 +204,7 @@ export default function WorkoutPlanEditorModal({
                 type="text"
                 value={currentDay.name}
                 onChange={(e) => handleRenameDay(currentDay.id, e.target.value)}
-                className="w-36 rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white focus:border-amber-500 focus:outline-none"
+                className="w-36 rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white focus:border-sky-500 focus:outline-none"
                 placeholder="Nome giorno..."
               />
               {card.days.length > 1 && (
@@ -231,7 +231,7 @@ export default function WorkoutPlanEditorModal({
                 >
                   {/* Ordine */}
                   <div className="flex items-center gap-1.5">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-xs font-bold text-amber-400">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-sky-500/15 text-xs font-bold text-sky-400">
                       {idx + 1}
                     </span>
                     <div className="flex flex-col">
@@ -268,7 +268,7 @@ export default function WorkoutPlanEditorModal({
                       onChange={(e) =>
                         handleUpdateExercise(ex.id, { name: e.target.value })
                       }
-                      className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm font-medium text-white placeholder-slate-500 focus:border-amber-500 focus:outline-none"
+                      className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm font-medium text-white placeholder-slate-500 focus:border-sky-500 focus:outline-none"
                     />
                   </div>
 
@@ -310,7 +310,7 @@ export default function WorkoutPlanEditorModal({
                               ),
                             })
                           }
-                          className="rounded p-1 text-amber-400 hover:bg-slate-800"
+                          className="rounded p-1 text-sky-400 hover:bg-slate-800"
                           title="+1 Serie"
                         >
                           <Plus className="h-3.5 w-3.5" />
@@ -326,7 +326,7 @@ export default function WorkoutPlanEditorModal({
                             setsReps: e.target.value,
                           })
                         }
-                        className="w-28 flex-1 rounded-xl border border-slate-800 bg-slate-900 px-2.5 py-2 text-center font-mono text-sm font-bold text-amber-300 focus:border-amber-500 focus:outline-none"
+                        className="w-28 flex-1 rounded-xl border border-slate-800 bg-slate-900 px-2.5 py-2 text-center font-mono text-sm font-bold text-sky-300 focus:border-sky-500 focus:outline-none"
                       />
 
                       {/* Stepper Ripetizioni */}
@@ -361,7 +361,7 @@ export default function WorkoutPlanEditorModal({
                               ),
                             })
                           }
-                          className="rounded p-1 text-amber-400 hover:bg-slate-800"
+                          className="rounded p-1 text-sky-400 hover:bg-slate-800"
                           title="+1 Ripetizione"
                         >
                           <Plus className="h-3.5 w-3.5" />
@@ -387,7 +387,7 @@ export default function WorkoutPlanEditorModal({
               <button
                 type="button"
                 onClick={handleAddExercise}
-                className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-slate-700 bg-slate-950/60 py-3 text-xs font-bold text-amber-400 transition hover:border-amber-500 hover:bg-amber-500/10"
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-slate-700 bg-slate-950/60 py-3 text-xs font-bold text-sky-400 transition hover:border-sky-500 hover:bg-sky-500/10"
               >
                 <Plus className="h-4 w-4" /> Aggiungi Esercizio a {currentDay.name}
               </button>

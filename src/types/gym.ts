@@ -1,5 +1,7 @@
 export type UserRole = "trainer" | "athlete";
 
+export type AppTheme = "dark" | "light" | "metallic";
+
 export interface AuthSession {
   role: UserRole;
   athleteId?: string;

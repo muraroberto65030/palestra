@@ -116,7 +116,7 @@ export default function CardModal({
       <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl">
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-800 bg-slate-900 px-6 py-4">
           <h3 className="flex items-center gap-2 text-lg font-bold text-white">
-            <ClipboardList className="h-5 w-5 text-amber-400" />
+            <ClipboardList className="h-5 w-5 text-sky-400" />
             {initialCard ? "Modifica Scheda di Allenamento" : "Nuova Scheda di Allenamento"}
           </h3>
           <button
@@ -136,7 +136,7 @@ export default function CardModal({
               required
               value={athleteId}
               onChange={(e) => setAthleteId(e.target.value)}
-              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm text-white focus:border-amber-500 focus:outline-none"
+              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm text-white focus:border-sky-500 focus:outline-none"
             >
               <option value="" disabled>
                 Seleziona un utente...
@@ -160,7 +160,7 @@ export default function CardModal({
                 placeholder="Es. Scheda Autunno - Giorno 1/2"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-amber-500 focus:outline-none"
+                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-sky-500 focus:outline-none"
               />
             </div>
 
@@ -173,14 +173,14 @@ export default function CardModal({
                 placeholder="Es. Ipertrofia / Forza"
                 value={goal}
                 onChange={(e) => setGoal(e.target.value)}
-                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-amber-500 focus:outline-none"
+                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-sky-500 focus:outline-none"
               />
             </div>
           </div>
 
           <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-amber-400">
+              <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-sky-400">
                 <Calendar className="h-3.5 w-3.5" /> Periodo di Validità della Scheda
               </span>
               <div className="flex items-center gap-1.5">
@@ -190,7 +190,7 @@ export default function CardModal({
                     key={w}
                     type="button"
                     onClick={() => setQuickDuration(w)}
-                    className="rounded-lg border border-slate-700 bg-slate-900 px-2 py-0.5 text-xs font-medium text-slate-300 hover:border-amber-500 hover:text-amber-400"
+                    className="rounded-lg border border-slate-700 bg-slate-900 px-2 py-0.5 text-xs font-medium text-slate-300 hover:border-sky-500 hover:text-sky-400"
                   >
                     {w} sett.
                   </button>
@@ -206,7 +206,7 @@ export default function CardModal({
                   required
                   value={validFrom}
                   onChange={(e) => setValidFrom(e.target.value)}
-                  className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2 text-sm text-white focus:border-amber-500 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2 text-sm text-white focus:border-sky-500 focus:outline-none"
                 />
               </div>
               <div>
@@ -217,7 +217,7 @@ export default function CardModal({
                   min={validFrom}
                   value={validTo}
                   onChange={(e) => setValidTo(e.target.value)}
-                  className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2 text-sm text-white focus:border-amber-500 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2 text-sm text-white focus:border-sky-500 focus:outline-none"
                 />
               </div>
             </div>
@@ -231,7 +231,7 @@ export default function CardModal({
               <button
                 type="button"
                 onClick={handleAddDay}
-                className="flex items-center gap-1 rounded-lg bg-slate-800 px-2.5 py-1 text-xs font-medium text-amber-400 hover:bg-slate-700"
+                className="flex items-center gap-1 rounded-lg bg-slate-800 px-2.5 py-1 text-xs font-medium text-sky-400 hover:bg-slate-700"
               >
                 <Plus className="h-3.5 w-3.5" /> Aggiungi Giorno
               </button>
@@ -242,7 +242,7 @@ export default function CardModal({
                   key={day.id}
                   className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-950 px-3 py-2"
                 >
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-500/15 text-xs font-bold text-amber-400">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-sky-500/15 text-xs font-bold text-sky-400">
                     {idx + 1}
                   </span>
                   <input
@@ -282,7 +282,7 @@ export default function CardModal({
               placeholder="Indicazioni sui tempi di recupero, riscaldamento, progressione..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:border-amber-500 focus:outline-none"
+              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:border-sky-500 focus:outline-none"
             />
           </div>
 
@@ -298,7 +298,7 @@ export default function CardModal({
                 type="checkbox"
                 checked={archived}
                 onChange={(e) => setArchived(e.target.checked)}
-                className="h-5 w-5 accent-amber-500"
+                className="h-5 w-5 accent-sky-500"
               />
             </div>
           )}
@@ -313,7 +313,7 @@ export default function CardModal({
             </button>
             <button
               type="submit"
-              className="rounded-xl bg-amber-500 px-5 py-2 text-sm font-semibold text-slate-950 hover:bg-amber-400"
+              className="rounded-xl bg-sky-500 px-5 py-2 text-sm font-semibold text-slate-950 hover:bg-sky-400"
             >
               {initialCard ? "Salva Scheda" : "Crea Scheda"}
             </button>
