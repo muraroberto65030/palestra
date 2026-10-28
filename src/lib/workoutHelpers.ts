@@ -19,48 +19,115 @@ export function formatItalianNumber(num: number): string {
 }
 
 /**
- * Estrae i singoli numeri interi proposti per Serie e Ripetizioni
- * a partire dalla stringa con range della scheda (es. "4x8-10" -> { sets: 4, reps: 8 },
- * "3\4x8+max" -> { sets: 3, reps: 8 }, "3x-10-12" -> { sets: 3, reps: 10 }).
+ * Verifica se nella descrizione dell'esercizio c'è un "+" (Super Serie di due esercizi)
+ * e restituisce i nomi dei due singoli esercizi.
+ */
+export function parseSupersetNames(exerciseName: string): {
+  isSuperset: boolean;
+  name1: string;
+  name2: string;
+} {
+  const raw = (exerciseName || "").trim();
+  const plusIndex = raw.indexOf("+");
+  if (plusIndex === -1) {
+    return {
+      isSuperset: false,
+      name1: raw || "Esercizio",
+      name2: "",
+    };
+  }
+  const name1 = raw.slice(0, plusIndex).trim() || "Esercizio 1";
+  const name2 = raw.slice(plusIndex + 1).trim() || "Esercizio 2";
+  return {
+    isSuperset: true,
+    name1,
+    name2,
+  };
+}
+
+/**
+ * Separa una stringa di carico combinato (es. "42,5+6") nei due carichi della Superserie.
+ */
+export function splitSupersetWeight(rawWeight: string): {
+  weight1: string;
+  weight2: string;
+} {
+  const trimmed = (rawWeight || "").trim();
+  if (!trimmed) return { weight1: "", weight2: "" };
+
+  // Se inizia con "+" (es. "+15+6"), cerchiamo eventuale secondo "+"
+  const hasLeadingPlus = trimmed.startsWith("+");
+  const body = hasLeadingPlus ? trimmed.slice(1) : trimmed;
+  const plusIdx = body.indexOf("+");
+  if (plusIdx === -1) {
+    return { weight1: trimmed, weight2: "" };
+  }
+
+  const w1 = `${hasLeadingPlus ? "+" : ""}${body.slice(0, plusIdx).trim()}`;
+  const w2 = body.slice(plusIdx + 1).trim();
+  return { weight1: w1, weight2: w2 };
+}
+
+/**
+ * Estrae i singoli numeri interi proposti per Serie, Ripetizioni 1 e Ripetizioni 2 (per le Superserie)
+ * a partire dalla stringa con range della scheda (es. "4x8+10" -> { sets: 4, reps: 8, reps2: 10 },
+ * "3\4x8+max" -> { sets: 3, reps: 8, reps2: 10 }, "4x8-10" -> { sets: 4, reps: 8, reps2: 8 }).
  */
 export function extractPlannedSetsAndReps(setsReps: string): {
   sets: number;
   reps: number;
+  reps2: number;
 } {
   const trimmed = (setsReps || "").trim();
   if (!trimmed) {
-    return { sets: 3, reps: 10 };
+    return { sets: 3, reps: 10, reps2: 10 };
   }
 
   const xIndex = trimmed.toLowerCase().indexOf("x");
   if (xIndex === -1) {
     const nums = trimmed.match(/\d+/g);
-    if (!nums || nums.length === 0) return { sets: 3, reps: 10 };
-    if (nums.length === 1) return { sets: 3, reps: parseInt(nums[0], 10) };
-    return { sets: parseInt(nums[0], 10), reps: parseInt(nums[1], 10) };
+    if (!nums || nums.length === 0) return { sets: 3, reps: 10, reps2: 10 };
+    if (nums.length === 1) {
+      const r = parseInt(nums[0], 10);
+      return { sets: 3, reps: r, reps2: r };
+    }
+    return {
+      sets: parseInt(nums[0], 10),
+      reps: parseInt(nums[1], 10),
+      reps2: parseInt(nums[1], 10),
+    };
   }
 
   const leftPart = trimmed.slice(0, xIndex);
   const rightPart = trimmed.slice(xIndex + 1);
 
   const leftNums = leftPart.match(/\d+/g);
-  const rightNums = rightPart.match(/\d+/g);
-
   const sets =
-    leftNums && leftNums.length > 0 ? Math.max(1, parseInt(leftNums[0], 10)) : 3;
+    leftNums && leftNums.length > 0
+      ? Math.max(1, parseInt(leftNums[0], 10))
+      : 3;
+
+  // Se nella parte ripetizioni c'è un "+" (es. "8+10" o "8+max"), estrae separatamente reps1 e reps2
+  if (rightPart.includes("+")) {
+    const [repPart1, repPart2] = rightPart.split("+");
+    const n1 = repPart1.match(/\d+/);
+    const n2 = repPart2 ? repPart2.match(/\d+/) : null;
+    const reps1 = n1 ? Math.max(1, parseInt(n1[0], 10)) : 10;
+    const reps2 = n2 ? Math.max(1, parseInt(n2[0], 10)) : 10;
+    return { sets, reps: reps1, reps2 };
+  }
+
+  const rightNums = rightPart.match(/\d+/g);
   const reps =
     rightNums && rightNums.length > 0
       ? Math.max(1, parseInt(rightNums[0], 10))
       : 10;
 
-  return { sets, reps };
+  return { sets, reps, reps2: reps };
 }
 
 /**
- * Analizza una stringa di carico (es. "+15", "70", "42,5+6", "45+7+4", "5+5").
- * Restituisce:
- * - hasLeadingPlus: true se inizia con "+" (es. "+15")
- * - parts: array dei segmenti numerici (es. ["15"] per "+15", ["42,5", "6"] per "42,5+6")
+ * Analizza una stringa di carico (es. "+15", "70", "5+5").
  */
 export function parseWeightComponents(raw: string): {
   hasLeadingPlus: boolean;
@@ -88,8 +155,7 @@ export function parseWeightComponents(raw: string): {
 }
 
 /**
- * Applica un incremento/decremento (delta) a una parte specifica del carico
- * (di default partIndex = 0, oppure tutte le parti se sono uguali es. "5+5" -> "6+6" quando stepSymmetricTogether=true).
+ * Applica un incremento/decremento (delta) a una stringa di carico.
  */
 export function stepWeightString(
   raw: string,
@@ -176,19 +242,22 @@ export function stepSetsRepsString(
 }
 
 /**
- * Trova l'ultimo carico e gli ultimi numeri di Serie/Ripetizioni inseriti per un esercizio
- * prima (o in data diversa) dalla data corrente.
+ * Trova l'ultimo carico (o i due carichi in caso di Superserie) e gli ultimi numeri di Serie/Ripetizioni
+ * inseriti per un esercizio prima (o in data diversa) dalla data corrente.
  */
 export function getLastExerciseHistory(
   logs: WorkoutSessionLog[],
   cardId: string,
   dayId: string,
   exerciseId: string,
-  currentDate: string
+  currentDate: string,
+  isSuperset: boolean = false
 ): {
   lastWeight: string;
+  lastWeight2: string;
   lastSets: number | null;
   lastReps: number | null;
+  lastReps2: number | null;
   lastDate: string | null;
 } {
   const previousLogs = logs
@@ -207,17 +276,33 @@ export function getLastExerciseHistory(
 
   for (const log of previousLogs) {
     const w = log.weightsByExercise?.[exerciseId];
+    const w2 = log.weights2ByExercise?.[exerciseId];
     const s = log.setsByExercise?.[exerciseId];
     const r = log.repsByExercise?.[exerciseId];
+    const r2 = log.reps2ByExercise?.[exerciseId];
     if (
       (w && w.trim() !== "") ||
+      (w2 && w2.trim() !== "") ||
       typeof s === "number" ||
-      typeof r === "number"
+      typeof r === "number" ||
+      typeof r2 === "number"
     ) {
+      let resolvedW1 = w ?? "";
+      let resolvedW2 = w2 ?? "";
+
+      // Se è una Superserie e nello storico c'era un carico combinato tipo "42,5+6", lo separa nei 2 carichi
+      if (isSuperset && !resolvedW2 && resolvedW1.includes("+")) {
+        const split = splitSupersetWeight(resolvedW1);
+        resolvedW1 = split.weight1;
+        resolvedW2 = split.weight2;
+      }
+
       return {
-        lastWeight: w ?? "",
+        lastWeight: resolvedW1,
+        lastWeight2: resolvedW2,
         lastSets: typeof s === "number" ? s : null,
         lastReps: typeof r === "number" ? r : null,
+        lastReps2: typeof r2 === "number" ? r2 : null,
         lastDate: log.date,
       };
     }
@@ -225,8 +310,10 @@ export function getLastExerciseHistory(
 
   return {
     lastWeight: "",
+    lastWeight2: "",
     lastSets: null,
     lastReps: null,
+    lastReps2: null,
     lastDate: null,
   };
 }

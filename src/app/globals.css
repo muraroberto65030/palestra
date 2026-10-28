@@ -31,6 +31,27 @@ body {
   @apply bg-slate-950 text-slate-100 antialiased selection:bg-sky-500 selection:text-white transition-colors duration-200;
 }
 
+/* Colori stato scritta "Serie" (0 = Rosso, 1..N-1 = Giallo, >=N = Verde) */
+.serie-label-red {
+  color: #f43f5e !important;
+}
+.serie-label-yellow {
+  color: #facc15 !important;
+}
+.serie-label-green {
+  color: #34d399 !important;
+}
+
+html[data-theme="light"] .serie-label-red {
+  color: #dc2626 !important;
+}
+html[data-theme="light"] .serie-label-yellow {
+  color: #d97706 !important;
+}
+html[data-theme="light"] .serie-label-green {
+  color: #16a34a !important;
+}
+
 /* =========================================================
    TEMA CHIARO (LIGHT MODE) — Blu Cobalto Sportivo su Ghiaccio
    ========================================================= */

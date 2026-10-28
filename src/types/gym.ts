@@ -43,12 +43,16 @@ export interface WorkoutSessionLog {
   athleteId: string;
   dayId: string; // riferimento a WorkoutDay.id
   date: string; // YYYY-MM-DD
-  /** Mappa exerciseId -> valore annotato nella casella Kg (es. "+15", "42,5+6", "70") */
+  /** Mappa exerciseId -> valore annotato nella casella Kg (es. "+15", "70") */
   weightsByExercise: Record<string, string>;
+  /** Mappa exerciseId -> secondo carico Kg per gli esercizi in Superserie (con "+" nel nome) */
+  weights2ByExercise?: Record<string, string>;
   /** Mappa exerciseId -> numero di Serie effettuate nella sessione (es. 4) */
   setsByExercise?: Record<string, number>;
-  /** Mappa exerciseId -> numero di Ripetizioni effettuate nella sessione (es. 10) */
+  /** Mappa exerciseId -> numero di Ripetizioni effettuate nella sessione (es. 8) */
   repsByExercise?: Record<string, number>;
+  /** Mappa exerciseId -> secondo numero di Ripetizioni per gli esercizi in Superserie (es. 10) */
+  reps2ByExercise?: Record<string, number>;
   notes?: string;
 }
 

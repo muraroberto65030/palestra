@@ -14,15 +14,17 @@ import {
 import {
   applyThemeToDocument,
   clearAuthSession,
+  fetchGymDatabaseFromApi,
   formatItalianDate,
   getCardStatus,
   loadAuthSession,
   loadGymDatabase,
   loadTheme,
-  resetToInitialDatabase,
+  resetDatabaseViaApi,
   saveAuthSession,
-  saveGymDatabase,
   saveTheme,
+  syncGymDatabaseToApi,
+  upsertWorkoutLogToApi,
 } from "@/lib/storage";
 import AthleteModal from "@/components/AthleteModal";
 import CardModal from "@/components/CardModal";
@@ -97,8 +99,6 @@ export default function GymHomePage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    const loaded = loadGymDatabase();
-    setDb(loaded);
     const savedTheme = loadTheme();
     setTheme(savedTheme);
     applyThemeToDocument(savedTheme);
@@ -106,14 +106,26 @@ export default function GymHomePage() {
     if (savedAuth) {
       setAuthSession(savedAuth);
       setRole(savedAuth.role);
-      if (savedAuth.role === "athlete" && savedAuth.athleteId) {
-        setActiveAthleteId(savedAuth.athleteId);
-        const firstCard = loaded.cards.find(
-          (c) => c.athleteId === savedAuth.athleteId && !c.archived
-        );
-        setActiveCardIdForWorkout(firstCard?.id || null);
-      }
     }
+
+    // Carica subito eventuale cache locale per reattività e poi sincronizza dal DB PostgreSQL su Prisma
+    const cached = loadGymDatabase();
+    setDb(cached);
+
+    fetchGymDatabaseFromApi()
+      .then((remoteDb) => {
+        setDb(remoteDb);
+        if (savedAuth?.role === "athlete" && savedAuth.athleteId) {
+          setActiveAthleteId(savedAuth.athleteId);
+          const firstCard = remoteDb.cards.find(
+            (c) => c.athleteId === savedAuth.athleteId && !c.archived
+          );
+          setActiveCardIdForWorkout(firstCard?.id || null);
+        }
+      })
+      .catch((err) => {
+        console.error("Fallback cache locale:", err);
+      });
   }, []);
 
   const handleChangeTheme = (nextTheme: AppTheme) => {
@@ -141,7 +153,7 @@ export default function GymHomePage() {
 
   const persistDb = (nextDb: GymDatabase) => {
     setDb(nextDb);
-    saveGymDatabase(nextDb);
+    syncGymDatabaseToApi(nextDb);
   };
 
   // CRUD Utenti
@@ -222,7 +234,7 @@ export default function GymHomePage() {
     persistDb({ ...db, cards: nextCards });
   };
 
-  // Salvataggio automatico immediato per i Log giornalieri (Serie numero, Ripetizioni numero e Kg con + e -)
+  // Salvataggio automatico immediato per i Log giornalieri (incluso supporto Superserie: 2 ripetizioni e 2 carichi)
   const handleAutoSaveLog = (
     cardId: string,
     athleteId: string,
@@ -230,8 +242,10 @@ export default function GymHomePage() {
     date: string,
     updater: (prevLog: WorkoutSessionLog | null) => {
       weightsByExercise: Record<string, string>;
+      weights2ByExercise?: Record<string, string>;
       setsByExercise: Record<string, number>;
       repsByExercise: Record<string, number>;
+      reps2ByExercise?: Record<string, number>;
       notes?: string;
     }
   ) => {
@@ -245,37 +259,42 @@ export default function GymHomePage() {
         existingIndex >= 0 ? prevDb.logs[existingIndex] : null;
       const updatedFields = updater(existingLog);
 
+      let targetLog: WorkoutSessionLog;
       let nextLogs: WorkoutSessionLog[];
       if (existingIndex >= 0 && existingLog) {
-        const updatedLog: WorkoutSessionLog = {
+        targetLog = {
           ...existingLog,
           weightsByExercise: updatedFields.weightsByExercise,
+          weights2ByExercise: updatedFields.weights2ByExercise,
           setsByExercise: updatedFields.setsByExercise,
           repsByExercise: updatedFields.repsByExercise,
+          reps2ByExercise: updatedFields.reps2ByExercise,
           notes: updatedFields.notes,
         };
         nextLogs = [...prevDb.logs];
-        nextLogs[existingIndex] = updatedLog;
+        nextLogs[existingIndex] = targetLog;
       } else {
-        const newLog: WorkoutSessionLog = {
+        targetLog = {
           id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           cardId,
           athleteId,
           dayId,
           date,
           weightsByExercise: updatedFields.weightsByExercise,
+          weights2ByExercise: updatedFields.weights2ByExercise,
           setsByExercise: updatedFields.setsByExercise,
           repsByExercise: updatedFields.repsByExercise,
+          reps2ByExercise: updatedFields.reps2ByExercise,
           notes: updatedFields.notes,
         };
-        nextLogs = [...prevDb.logs, newLog];
+        nextLogs = [...prevDb.logs, targetLog];
       }
 
       const nextDb: GymDatabase = {
         ...prevDb,
         logs: nextLogs,
       };
-      saveGymDatabase(nextDb);
+      upsertWorkoutLogToApi(targetLog, nextDb);
       return nextDb;
     });
   };
@@ -371,14 +390,14 @@ export default function GymHomePage() {
     e.target.value = "";
   };
 
-  const handleResetDemo = () => {
+  const handleResetDemo = async () => {
     if (
       !window.confirm(
-        "Ripristinare i dati iniziali di esempio (inclusa la scheda di Roberto Mura)?"
+        "Ripristinare i dati iniziali di esempio (inclusa la scheda di Roberto Mura) sul database PostgreSQL?"
       )
     )
       return;
-    const fresh = resetToInitialDatabase();
+    const fresh = await resetDatabaseViaApi();
     setDb(fresh);
     setSelectedAthleteFilter("all");
     setActiveAthleteId("ath-roberto-mura");

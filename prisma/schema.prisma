@@ -1,0 +1,73 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Athlete {
+  id        String              @id
+  fullName  String
+  email     String?
+  phone     String?
+  pin       String?
+  notes     String?
+  createdAt String
+  active    Boolean             @default(true)
+  cards     WorkoutCard[]
+  logs      WorkoutSessionLog[]
+}
+
+model WorkoutCard {
+  id        String              @id
+  athleteId String
+  athlete   Athlete             @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  title     String
+  goal      String?
+  validFrom String
+  validTo   String
+  notes     String?
+  archived  Boolean             @default(false)
+  createdAt String
+  days      WorkoutDay[]
+  logs      WorkoutSessionLog[]
+}
+
+model WorkoutDay {
+  id        String        @id
+  cardId    String
+  card      WorkoutCard   @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  name      String
+  sortOrder Int           @default(0)
+  exercises ExerciseRow[]
+}
+
+model ExerciseRow {
+  id        String     @id
+  dayId     String
+  day       WorkoutDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  name      String
+  setsReps  String
+  notes     String?
+  sortOrder Int        @default(0)
+}
+
+model WorkoutSessionLog {
+  id                 String      @id
+  cardId             String
+  card               WorkoutCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  athleteId          String
+  athlete            Athlete     @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  dayId              String
+  date               String
+  weightsByExercise  Json        @default("{}")
+  weights2ByExercise Json        @default("{}")
+  setsByExercise     Json        @default("{}")
+  repsByExercise     Json        @default("{}")
+  reps2ByExercise    Json        @default("{}")
+  notes              String?
+
+  @@unique([cardId, dayId, date])
+}

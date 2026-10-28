@@ -1,9 +1,76 @@
-import { AppTheme, AuthSession, CardValidityStatus, GymDatabase, WorkoutCard } from "@/types/gym";
+import { AppTheme, AuthSession, CardValidityStatus, GymDatabase, WorkoutCard, WorkoutSessionLog } from "@/types/gym";
 import { INITIAL_GYM_DATA } from "./initialData";
 
 const STORAGE_KEY = "palestra_schede_db_v1";
 const AUTH_STORAGE_KEY = "palestra_auth_session_v1";
 const THEME_STORAGE_KEY = "palestra_theme_v1";
+
+export async function fetchGymDatabaseFromApi(): Promise<GymDatabase> {
+  const res = await fetch("/api/gym", { cache: "no-store" });
+  if (!res.ok) {
+    throw new Error("Errore caricamento dal database PostgreSQL");
+  }
+  const data = (await res.json()) as GymDatabase;
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  }
+  return data;
+}
+
+let fullSyncTimer: ReturnType<typeof setTimeout> | null = null;
+
+export function syncGymDatabaseToApi(db: GymDatabase): void {
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+  }
+  if (fullSyncTimer) clearTimeout(fullSyncTimer);
+  fullSyncTimer = setTimeout(() => {
+    fetch("/api/gym", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ db }),
+    }).catch((err) => console.error("Errore sync DB:", err));
+  }, 250);
+}
+
+const logTimers: Record<string, ReturnType<typeof setTimeout>> = {};
+
+export function upsertWorkoutLogToApi(
+  log: WorkoutSessionLog,
+  fullDbForLocalCache: GymDatabase
+): void {
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(fullDbForLocalCache)
+    );
+  }
+  const key = `${log.cardId}_${log.dayId}_${log.date}`;
+  if (logTimers[key]) clearTimeout(logTimers[key]);
+  logTimers[key] = setTimeout(() => {
+    fetch("/api/gym", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "upsert_log", log }),
+    }).catch((err) => console.error("Errore upsert log:", err));
+  }, 200);
+}
+
+export async function resetDatabaseViaApi(): Promise<GymDatabase> {
+  const res = await fetch("/api/gym", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "reset_demo" }),
+  });
+  if (!res.ok) {
+    return resetToInitialDatabase();
+  }
+  const fresh = (await res.json()) as GymDatabase;
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(fresh));
+  }
+  return fresh;
+}
 
 export function loadTheme(): AppTheme {
   if (typeof window === "undefined") return "dark";
