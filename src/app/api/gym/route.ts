@@ -54,78 +54,139 @@ async function seedDatabaseIfEmpty() {
 }
 
 async function replaceFullDatabase(data: GymDatabase) {
-  await prisma.$transaction(async (tx) => {
-    await tx.workoutSessionLog.deleteMany({});
-    await tx.exerciseRow.deleteMany({});
-    await tx.workoutDay.deleteMany({});
-    await tx.workoutCard.deleteMany({});
-    await tx.athlete.deleteMany({});
+  const athleteIds = new Set(data.athletes.map((a) => a.id));
+  const athleteRows = data.athletes.map((ath) => ({
+    id: ath.id,
+    fullName: ath.fullName,
+    email: ath.email ?? null,
+    phone: ath.phone ?? null,
+    pin: ath.pin ?? null,
+    notes: ath.notes ?? null,
+    createdAt: ath.createdAt,
+    active: ath.active,
+  }));
 
-    for (const ath of data.athletes) {
-      await tx.athlete.create({
-        data: {
-          id: ath.id,
-          fullName: ath.fullName,
-          email: ath.email ?? null,
-          phone: ath.phone ?? null,
-          pin: ath.pin ?? null,
-          notes: ath.notes ?? null,
-          createdAt: ath.createdAt,
-          active: ath.active,
-        },
-      });
-    }
+  const validCards = data.cards.filter((c) => athleteIds.has(c.athleteId));
+  const cardIds = new Set(validCards.map((c) => c.id));
 
-    for (const card of data.cards) {
-      await tx.workoutCard.create({
-        data: {
-          id: card.id,
-          athleteId: card.athleteId,
-          title: card.title,
-          goal: card.goal ?? null,
-          validFrom: card.validFrom,
-          validTo: card.validTo,
-          notes: card.notes ?? null,
-          archived: Boolean(card.archived),
-          createdAt: card.createdAt,
-          days: {
-            create: card.days.map((day, dIdx) => ({
-              id: day.id,
-              name: day.name,
-              sortOrder: dIdx,
-              exercises: {
-                create: day.exercises.map((ex, eIdx) => ({
-                  id: ex.id,
-                  name: ex.name,
-                  setsReps: ex.setsReps,
-                  notes: ex.notes ?? null,
-                  sortOrder: eIdx,
-                })),
-              },
-            })),
-          },
-        },
-      });
-    }
+  const cardRows = validCards.map((card) => ({
+    id: card.id,
+    athleteId: card.athleteId,
+    title: card.title,
+    goal: card.goal ?? null,
+    validFrom: card.validFrom,
+    validTo: card.validTo,
+    notes: card.notes ?? null,
+    archived: Boolean(card.archived),
+    createdAt: card.createdAt,
+  }));
 
-    for (const log of data.logs) {
-      await tx.workoutSessionLog.create({
-        data: {
-          id: log.id,
-          cardId: log.cardId,
-          athleteId: log.athleteId,
-          dayId: log.dayId,
-          date: log.date,
-          weightsByExercise: log.weightsByExercise ?? {},
-          weights2ByExercise: log.weights2ByExercise ?? {},
-          setsByExercise: log.setsByExercise ?? {},
-          repsByExercise: log.repsByExercise ?? {},
-          reps2ByExercise: log.reps2ByExercise ?? {},
-          notes: log.notes ?? null,
-        },
+  const dayRows: {
+    id: string;
+    cardId: string;
+    name: string;
+    sortOrder: number;
+  }[] = [];
+
+  const exerciseRows: {
+    id: string;
+    dayId: string;
+    name: string;
+    setsReps: string;
+    notes: string | null;
+    sortOrder: number;
+  }[] = [];
+
+  for (const card of validCards) {
+    (card.days || []).forEach((day, dIdx) => {
+      dayRows.push({
+        id: day.id,
+        cardId: card.id,
+        name: day.name,
+        sortOrder: dIdx,
       });
-    }
-  });
+      (day.exercises || []).forEach((ex, eIdx) => {
+        exerciseRows.push({
+          id: ex.id,
+          dayId: day.id,
+          name: ex.name,
+          setsReps: ex.setsReps,
+          notes: ex.notes ?? null,
+          sortOrder: eIdx,
+        });
+      });
+    });
+  }
+
+  const seenLogKeys = new Set<string>();
+  const logRows: {
+    id: string;
+    cardId: string;
+    athleteId: string;
+    dayId: string;
+    date: string;
+    weightsByExercise: Record<string, string>;
+    weights2ByExercise: Record<string, string>;
+    setsByExercise: Record<string, number>;
+    repsByExercise: Record<string, number>;
+    reps2ByExercise: Record<string, number>;
+    notes: string | null;
+  }[] = [];
+
+  for (const log of data.logs || []) {
+    if (!cardIds.has(log.cardId) || !athleteIds.has(log.athleteId)) continue;
+    const uniqueKey = `${log.cardId}__${log.dayId}__${log.date}`;
+    if (seenLogKeys.has(uniqueKey)) continue;
+    seenLogKeys.add(uniqueKey);
+
+    logRows.push({
+      id: log.id,
+      cardId: log.cardId,
+      athleteId: log.athleteId,
+      dayId: log.dayId,
+      date: log.date,
+      weightsByExercise: log.weightsByExercise ?? {},
+      weights2ByExercise: log.weights2ByExercise ?? {},
+      setsByExercise: log.setsByExercise ?? {},
+      repsByExercise: log.repsByExercise ?? {},
+      reps2ByExercise: log.reps2ByExercise ?? {},
+      notes: log.notes ?? null,
+    });
+  }
+
+  // Usa transazione batch non-interattiva con createMany bulk per evitare timeout P2028 su PgBouncer / Prisma Pooler
+  await prisma.$transaction([
+    prisma.workoutSessionLog.deleteMany({}),
+    prisma.exerciseRow.deleteMany({}),
+    prisma.workoutDay.deleteMany({}),
+    prisma.workoutCard.deleteMany({}),
+    prisma.athlete.deleteMany({}),
+    ...(athleteRows.length > 0
+      ? [prisma.athlete.createMany({ data: athleteRows, skipDuplicates: true })]
+      : []),
+    ...(cardRows.length > 0
+      ? [prisma.workoutCard.createMany({ data: cardRows, skipDuplicates: true })]
+      : []),
+    ...(dayRows.length > 0
+      ? [prisma.workoutDay.createMany({ data: dayRows, skipDuplicates: true })]
+      : []),
+    ...(exerciseRows.length > 0
+      ? [
+          prisma.exerciseRow.createMany({
+            data: exerciseRows,
+            skipDuplicates: true,
+          }),
+        ]
+      : []),
+    ...(logRows.length > 0
+      ? [
+          prisma.workoutSessionLog.createMany({
+            data: logRows,
+            skipDuplicates: true,
+          }),
+        ]
+      : []),
+  ]);
 }
 
 async function fetchFullDatabase(): Promise<GymDatabase> {
