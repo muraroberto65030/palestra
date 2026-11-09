@@ -519,7 +519,7 @@ export const INITIAL_GYM_DATA: GymDatabase = {
     },
     {
       "id": "log-1793309499241-6fvi",
-      "cardId": "card-1793307170199",
+      "cardId": "card-1793307115366-lello-1",
       "athleteId": "ath-1793307115366",
       "dayId": "day-1793307128856-1",
       "date": "2026-10-29",
@@ -553,7 +553,7 @@ export const INITIAL_GYM_DATA: GymDatabase = {
     },
     {
       "id": "log-1793309734627-7hmq",
-      "cardId": "card-1793307170199",
+      "cardId": "card-1793307115366-lello-1",
       "athleteId": "ath-1793307115366",
       "dayId": "day-1793307128856-2",
       "date": "2026-10-29",
@@ -591,7 +591,7 @@ export const INITIAL_GYM_DATA: GymDatabase = {
     },
     {
       "id": "log-1793309886212-3pez",
-      "cardId": "card-1793307170199",
+      "cardId": "card-1793307115366-lello-1",
       "athleteId": "ath-1793307115366",
       "dayId": "day-1793307159972-3",
       "date": "2026-10-29",
@@ -627,7 +627,7 @@ export const INITIAL_GYM_DATA: GymDatabase = {
     },
     {
       "id": "log-1793644957581-echv",
-      "cardId": "card-1793307170199",
+      "cardId": "card-1793307115366-lello-1",
       "athleteId": "ath-1793307115366",
       "dayId": "day-1793307128856-1",
       "date": "2026-11-02",
@@ -663,7 +663,7 @@ export const INITIAL_GYM_DATA: GymDatabase = {
     },
     {
       "id": "log-1793728352155-9emr",
-      "cardId": "card-1793307170199",
+      "cardId": "card-1793307115366-lello-1",
       "athleteId": "ath-1793307115366",
       "dayId": "day-1793307161914-4",
       "date": "2026-11-03",
@@ -693,7 +693,7 @@ export const INITIAL_GYM_DATA: GymDatabase = {
     },
     {
       "id": "log-1793785056810-iuyo",
-      "cardId": "card-1793307170199",
+      "cardId": "card-1793307115366-lello-1",
       "athleteId": "ath-1793307115366",
       "dayId": "day-1793307128856-2",
       "date": "2026-11-04",
@@ -731,7 +731,7 @@ export const INITIAL_GYM_DATA: GymDatabase = {
     },
     {
       "id": "log-1793904319529-m7dj",
-      "cardId": "card-1793307170199",
+      "cardId": "card-1793307115366-lello-1",
       "athleteId": "ath-1793307115366",
       "dayId": "day-1793307159972-3",
       "date": "2026-11-05",

@@ -5,6 +5,42 @@ import { GymDatabase, WorkoutSessionLog } from "@/types/gym";
 
 export const dynamic = "force-dynamic";
 
+function getPrismaErrorCode(error: unknown): string | undefined {
+  if (typeof error !== "object" || error === null) return undefined;
+  if ("errorCode" in error && typeof error.errorCode === "string") {
+    return error.errorCode;
+  }
+  if (
+    "code" in error &&
+    typeof error.code === "string" &&
+    error.code.startsWith("P")
+  ) {
+    return error.code;
+  }
+  return undefined;
+}
+
+function getDatabaseErrorMessage(error: unknown, operation: string): string {
+  if (!process.env.DATABASE_URL?.trim()) {
+    return "DATABASE_URL non è configurata per questa distribuzione Vercel.";
+  }
+
+  const code = getPrismaErrorCode(error);
+  if (code === "P1000") {
+    return "Autenticazione PostgreSQL fallita (Prisma P1000). Verifica le credenziali in DATABASE_URL.";
+  }
+  if (code === "P1001") {
+    return "PostgreSQL non è raggiungibile da Vercel (Prisma P1001). Verifica host, rete e disponibilità del database.";
+  }
+  if (code === "P2021") {
+    return "Le tabelle dell'app non esistono nel database (Prisma P2021). Va applicato lo schema Prisma.";
+  }
+
+  return code
+    ? `Errore ${operation} del database PostgreSQL (Prisma ${code}).`
+    : `Errore ${operation} del database PostgreSQL. Controlla i log della funzione su Vercel.`;
+}
+
 async function seedDatabaseIfEmpty() {
   const count = await prisma.athlete.count();
   if (count > 0) return;
@@ -167,7 +203,10 @@ export async function GET() {
   } catch (error) {
     console.error("GET /api/gym error:", error);
     return NextResponse.json(
-      { error: "Errore lettura database PostgreSQL" },
+      {
+        error: getDatabaseErrorMessage(error, "lettura"),
+        code: getPrismaErrorCode(error),
+      },
       { status: 500 }
     );
   }
@@ -227,7 +266,10 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("POST /api/gym error:", error);
     return NextResponse.json(
-      { error: "Errore salvataggio database PostgreSQL" },
+      {
+        error: getDatabaseErrorMessage(error, "salvataggio"),
+        code: getPrismaErrorCode(error),
+      },
       { status: 500 }
     );
   }

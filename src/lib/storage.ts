@@ -63,8 +63,10 @@ export async function resetDatabaseViaApi(): Promise<GymDatabase> {
     body: JSON.stringify({ action: "reset_demo" }),
   });
   if (!res.ok) {
+    const body = (await res.json()) as { error?: string };
     throw new Error(
-      `Ripristino del database PostgreSQL non riuscito (HTTP ${res.status}).`
+      body.error ||
+        `Ripristino del database PostgreSQL non riuscito (HTTP ${res.status}).`
     );
   }
   const fresh = (await res.json()) as GymDatabase;
