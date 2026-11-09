@@ -14,7 +14,9 @@ import {
 import {
   applyThemeToDocument,
   clearAuthSession,
+  CloudSyncState,
   fetchGymDatabaseFromApi,
+  forceMergeLocalToCloud,
   formatItalianDate,
   getCardStatus,
   loadAuthSession,
@@ -23,6 +25,7 @@ import {
   resetDatabaseViaApi,
   saveAuthSession,
   saveTheme,
+  subscribeSyncStatus,
   syncGymDatabaseToApi,
   upsertWorkoutLogToApi,
 } from "@/lib/storage";
@@ -61,6 +64,9 @@ import {
   Sun,
   Moon,
   Sparkle,
+  Cloud,
+  CloudOff,
+  RefreshCw,
 } from "lucide-react";
 
 export default function GymHomePage() {
@@ -68,6 +74,12 @@ export default function GymHomePage() {
   const [authSession, setAuthSession] = useState<AuthSession | null>(null);
   const [role, setRole] = useState<UserRole>("athlete");
   const [theme, setTheme] = useState<AppTheme>("dark");
+  const [syncState, setSyncState] = useState<CloudSyncState>({
+    status: "syncing",
+    message: "Connessione al database Cloud...",
+    hasPendingLocalChanges: false,
+    lastSyncedAt: null,
+  });
 
   // Trainer state
   const [selectedAthleteFilter, setSelectedAthleteFilter] =
@@ -99,6 +111,10 @@ export default function GymHomePage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
+    const unsubscribe = subscribeSyncStatus((state) => {
+      setSyncState(state);
+    });
+
     const savedTheme = loadTheme();
     setTheme(savedTheme);
     applyThemeToDocument(savedTheme);
@@ -108,25 +124,55 @@ export default function GymHomePage() {
       setRole(savedAuth.role);
     }
 
-    // Carica subito eventuale cache locale per reattività e poi sincronizza dal DB PostgreSQL su Prisma
+    // Carica subito eventuale cache locale per reattività e poi unisce/sincronizza col DB PostgreSQL su Prisma
     const cached = loadGymDatabase();
     setDb(cached);
 
-    fetchGymDatabaseFromApi()
-      .then((remoteDb) => {
-        setDb(remoteDb);
-        if (savedAuth?.role === "athlete" && savedAuth.athleteId) {
-          setActiveAthleteId(savedAuth.athleteId);
-          const firstCard = remoteDb.cards.find(
-            (c) => c.athleteId === savedAuth.athleteId && !c.archived
-          );
-          setActiveCardIdForWorkout(firstCard?.id || null);
-        }
-      })
-      .catch((err) => {
-        console.error("Fallback cache locale:", err);
-      });
+    const runCloudSync = () => {
+      fetchGymDatabaseFromApi()
+        .then((remoteDb) => {
+          setDb(remoteDb);
+          const currentAuth = loadAuthSession();
+          if (currentAuth?.role === "athlete" && currentAuth.athleteId) {
+            setActiveAthleteId(currentAuth.athleteId);
+            const firstCard = remoteDb.cards.find(
+              (c) => c.athleteId === currentAuth.athleteId && !c.archived
+            );
+            setActiveCardIdForWorkout((prev) => prev || firstCard?.id || null);
+          }
+        })
+        .catch((err) => {
+          console.error("Fallback cache locale:", err);
+        });
+    };
+
+    runCloudSync();
+
+    const handleVisibilityOrOnline = () => {
+      if (document.visibilityState === "visible") {
+        runCloudSync();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityOrOnline);
+    window.addEventListener("online", runCloudSync);
+
+    return () => {
+      unsubscribe();
+      document.removeEventListener("visibilitychange", handleVisibilityOrOnline);
+      window.removeEventListener("online", runCloudSync);
+    };
   }, []);
+
+  const handleManualCloudSync = async () => {
+    if (!db) return;
+    try {
+      const merged = await forceMergeLocalToCloud(db);
+      setDb(merged);
+    } catch (err) {
+      console.error("Errore sincronizzazione manuale Cloud:", err);
+    }
+  };
 
   const handleChangeTheme = (nextTheme: AppTheme) => {
     setTheme(nextTheme);
@@ -624,6 +670,35 @@ export default function GymHomePage() {
               </button>
             </div>
 
+            {/* Indicatore Stato Database Cloud + Pulsante Sincronizzazione Manuale */}
+            <button
+              type="button"
+              onClick={handleManualCloudSync}
+              className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold transition ${
+                syncState.status === "synced"
+                  ? "border-emerald-500/35 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20"
+                  : syncState.status === "syncing"
+                  ? "border-sky-500/35 bg-sky-500/10 text-sky-300"
+                  : "border-amber-500/40 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25"
+              }`}
+              title={`${syncState.message} — Clicca per unire e sincronizzare i dati del dispositivo col database Cloud`}
+            >
+              {syncState.status === "syncing" ? (
+                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+              ) : syncState.status === "synced" ? (
+                <Cloud className="h-3.5 w-3.5 text-emerald-400" />
+              ) : (
+                <CloudOff className="h-3.5 w-3.5 text-amber-400" />
+              )}
+              <span>
+                {syncState.status === "synced"
+                  ? "DB Cloud OK"
+                  : syncState.status === "syncing"
+                  ? "Sync Cloud..."
+                  : "Sync DB"}
+              </span>
+            </button>
+
             <button
               onClick={() => setOriginalSheetOpen(true)}
               className="flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs font-medium text-slate-300 hover:border-sky-500/50 hover:text-sky-300"
@@ -633,16 +708,16 @@ export default function GymHomePage() {
               <span className="hidden sm:inline">Scheda Cartacea</span>
             </button>
 
+            <button
+              onClick={handleExportJson}
+              className="flex items-center gap-1 rounded-xl border border-slate-800 bg-slate-900 px-2.5 py-2 text-xs font-medium text-slate-300 hover:bg-slate-800"
+              title="Esporta Backup JSON dei dati sul dispositivo"
+            >
+              <Download className="h-4 w-4" />
+            </button>
+
             {isTrainerLoggedIn && (
               <>
-                <button
-                  onClick={handleExportJson}
-                  className="flex items-center gap-1 rounded-xl border border-slate-800 bg-slate-900 px-2.5 py-2 text-xs font-medium text-slate-300 hover:bg-slate-800"
-                  title="Esporta Backup JSON"
-                >
-                  <Download className="h-4 w-4" />
-                </button>
-
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   className="flex items-center gap-1 rounded-xl border border-slate-800 bg-slate-900 px-2.5 py-2 text-xs font-medium text-slate-300 hover:bg-slate-800"
@@ -682,6 +757,47 @@ export default function GymHomePage() {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+        {syncState.status === "error" && (
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-xs text-amber-200">
+            <div className="flex items-start gap-2.5">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+              <div>
+                <p className="font-bold text-amber-300">
+                  {syncState.message}
+                </p>
+                <p className="mt-0.5 text-[11px] text-slate-300">
+                  Nessun dato andrà perso: i tuoi allenamenti restano salvati sul
+                  dispositivo e verranno uniti automaticamente al database
+                  PostgreSQL appena la connessione sarà attiva (su Vercel
+                  assicurati che la variabile{" "}
+                  <code className="rounded bg-slate-900 px-1 py-0.5 font-mono text-sky-300">
+                    DATABASE_URL
+                  </code>{" "}
+                  sia presente in{" "}
+                  <strong>Settings &rarr; Environment Variables</strong>).
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleManualCloudSync}
+                className="flex items-center gap-1.5 rounded-xl bg-amber-500 px-3 py-1.5 text-xs font-bold text-slate-950 shadow hover:bg-amber-400"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                Invia dati al DB Cloud
+              </button>
+              <button
+                type="button"
+                onClick={handleExportJson}
+                className="flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:bg-slate-800"
+              >
+                <Download className="h-3.5 w-3.5" />
+                Backup .JSON
+              </button>
+            </div>
+          </div>
+        )}
         {isTrainerLoggedIn && role === "trainer" ? (
           <>
             {/* KPI Row */}

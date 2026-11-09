@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { INITIAL_GYM_DATA } from "@/lib/initialData";
-import { GymDatabase, WorkoutSessionLog } from "@/types/gym";
+import {
+  Athlete,
+  GymDatabase,
+  WorkoutCard,
+  WorkoutSessionLog,
+} from "@/types/gym";
 
 export const dynamic = "force-dynamic";
 
@@ -195,6 +200,132 @@ async function fetchFullDatabase(): Promise<GymDatabase> {
   };
 }
 
+function mergeLogs(
+  existing: WorkoutSessionLog,
+  incoming: WorkoutSessionLog
+): WorkoutSessionLog {
+  const weightsByExercise: Record<string, string> = {
+    ...(existing.weightsByExercise || {}),
+  };
+  for (const [exId, val] of Object.entries(incoming.weightsByExercise || {})) {
+    if (val && val.trim() !== "") {
+      weightsByExercise[exId] = val;
+    }
+  }
+
+  const weights2ByExercise: Record<string, string> = {
+    ...(existing.weights2ByExercise || {}),
+  };
+  for (const [exId, val] of Object.entries(incoming.weights2ByExercise || {})) {
+    if (val && val.trim() !== "") {
+      weights2ByExercise[exId] = val;
+    }
+  }
+
+  const setsByExercise: Record<string, number> = {
+    ...(existing.setsByExercise || {}),
+  };
+  for (const [exId, val] of Object.entries(incoming.setsByExercise || {})) {
+    const prev = setsByExercise[exId] ?? 0;
+    if (typeof val === "number" && (val > 0 || prev === 0)) {
+      setsByExercise[exId] = Math.max(prev, val);
+    }
+  }
+
+  const repsByExercise: Record<string, number> = {
+    ...(existing.repsByExercise || {}),
+  };
+  for (const [exId, val] of Object.entries(incoming.repsByExercise || {})) {
+    if (typeof val === "number" && val > 0) {
+      repsByExercise[exId] = val;
+    }
+  }
+
+  const reps2ByExercise: Record<string, number> = {
+    ...(existing.reps2ByExercise || {}),
+  };
+  for (const [exId, val] of Object.entries(incoming.reps2ByExercise || {})) {
+    if (typeof val === "number" && val > 0) {
+      reps2ByExercise[exId] = val;
+    }
+  }
+
+  return {
+    ...existing,
+    weightsByExercise,
+    weights2ByExercise,
+    setsByExercise,
+    repsByExercise,
+    reps2ByExercise,
+    notes: incoming.notes?.trim() ? incoming.notes : existing.notes,
+  };
+}
+
+function mergeGymDatabasesOnServer(
+  serverDb: GymDatabase,
+  deviceDb: GymDatabase
+): GymDatabase {
+  const athleteMap = new Map<string, Athlete>();
+  for (const a of serverDb.athletes) {
+    athleteMap.set(a.id, a);
+  }
+  for (const a of deviceDb.athletes || []) {
+    const prev = athleteMap.get(a.id);
+    athleteMap.set(a.id, prev ? { ...prev, ...a } : a);
+  }
+
+  const cardMap = new Map<string, WorkoutCard>();
+  for (const c of serverDb.cards) {
+    cardMap.set(c.id, c);
+  }
+  for (const c of deviceDb.cards || []) {
+    if (!athleteMap.has(c.athleteId)) continue;
+    const prev = cardMap.get(c.id);
+    if (!prev) {
+      cardMap.set(c.id, c);
+    } else {
+      // Mantiene la scheda con più giorni/esercizi o i dettagli aggiornati dal dispositivo
+      const prevExCount = prev.days.reduce(
+        (acc, d) => acc + d.exercises.length,
+        0
+      );
+      const incExCount = (c.days || []).reduce(
+        (acc, d) => acc + d.exercises.length,
+        0
+      );
+      cardMap.set(c.id, {
+        ...prev,
+        ...c,
+        days: incExCount >= prevExCount ? c.days : prev.days,
+      });
+    }
+  }
+
+  const logMap = new Map<string, WorkoutSessionLog>();
+  for (const l of serverDb.logs) {
+    const key = `${l.cardId}__${l.dayId}__${l.date}`;
+    logMap.set(key, l);
+  }
+  for (const l of deviceDb.logs || []) {
+    if (!cardMap.has(l.cardId) || !athleteMap.has(l.athleteId)) continue;
+    const key = `${l.cardId}__${l.dayId}__${l.date}`;
+    const prev = logMap.get(key);
+    if (!prev) {
+      logMap.set(key, l);
+    } else {
+      logMap.set(key, mergeLogs(prev, l));
+    }
+  }
+
+  return {
+    athletes: Array.from(athleteMap.values()),
+    cards: Array.from(cardMap.values()),
+    logs: Array.from(logMap.values()).sort((a, b) =>
+      a.date.localeCompare(b.date)
+    ),
+  };
+}
+
 export async function GET() {
   try {
     await seedDatabaseIfEmpty();
@@ -249,6 +380,18 @@ export async function POST(request: Request) {
         },
       });
       return NextResponse.json({ ok: true });
+    }
+
+    if (body.action === "merge_db" && body.db) {
+      await seedDatabaseIfEmpty();
+      const currentServerDb = await fetchFullDatabase();
+      const merged = mergeGymDatabasesOnServer(
+        currentServerDb,
+        body.db as GymDatabase
+      );
+      await replaceFullDatabase(merged);
+      const fresh = await fetchFullDatabase();
+      return NextResponse.json(fresh);
     }
 
     if (body.action === "reset_demo") {
