@@ -397,11 +397,20 @@ export default function GymHomePage() {
       )
     )
       return;
-    const fresh = await resetDatabaseViaApi();
-    setDb(fresh);
-    setSelectedAthleteFilter("all");
-    setActiveAthleteId("ath-roberto-mura");
-    setActiveCardIdForWorkout("card-roberto-autunno");
+    try {
+      const fresh = await resetDatabaseViaApi();
+      setDb(fresh);
+      setSelectedAthleteFilter("all");
+      setActiveAthleteId("ath-roberto-mura");
+      setActiveCardIdForWorkout("card-roberto-autunno");
+    } catch (error) {
+      console.error("Errore ripristino dati demo:", error);
+      window.alert(
+        error instanceof Error
+          ? error.message
+          : "Errore durante il ripristino del database PostgreSQL."
+      );
+    }
   };
 
   const filteredAthletes = useMemo(() => {
