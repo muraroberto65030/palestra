@@ -103,9 +103,11 @@ export default function DailyWorkoutTracker({
   const [selectedDate, setSelectedDate] = useState<string>(todayIso);
   const [weightStep, setWeightStep] = useState<number>(2.5);
 
-  // Impostazione Timer di Recupero (30 / 60 / 90 secondi) e stato del countdown
+  // Impostazione Timer di Recupero (30 / 60 / 90 secondi) e stato del countdown basato su timestamp reale
   const [restDuration, setRestDuration] = useState<30 | 60 | 90>(60);
+  const [restEndTimeMs, setRestEndTimeMs] = useState<number | null>(null);
   const [restRemaining, setRestRemaining] = useState<number | null>(null);
+  const [wakeLockActive, setWakeLockActive] = useState<boolean>(false);
 
   const [lastAutoSaveInfo, setLastAutoSaveInfo] = useState<string | null>(null);
 
@@ -119,25 +121,219 @@ export default function DailyWorkoutTracker({
   const touchStartXRef = useRef<number | null>(null);
   const touchStartYRef = useRef<number | null>(null);
 
-  // Gestione Countdown Timer Recupero
+  // Riferimento persistente ad AudioContext (sbloccato al tap dell'utente per compatibilità iOS/Android)
+  const audioCtxRef = useRef<AudioContext | null>(null);
+
+  const getUnlockedAudioContext = (): AudioContext | null => {
+    if (typeof window === "undefined") return null;
+    try {
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext?: typeof AudioContext })
+          .webkitAudioContext;
+      if (!AudioCtx) return null;
+      if (!audioCtxRef.current || audioCtxRef.current.state === "closed") {
+        audioCtxRef.current = new AudioCtx();
+      }
+      if (audioCtxRef.current.state === "suspended") {
+        audioCtxRef.current.resume().catch(() => {});
+      }
+      return audioCtxRef.current;
+    } catch {
+      return null;
+    }
+  };
+
+  // Funzione per emettere una notifica sonora (triplo beep da palestra) + vibrazione + notifica di sistema a fine recupero
+  const notifyRestFinished = () => {
+    try {
+      if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+        navigator.vibrate([300, 120, 300, 120, 450]);
+      }
+    } catch {
+      // Ignora se la vibrazione non è supportata
+    }
+
+    try {
+      const ctx = getUnlockedAudioContext();
+      if (ctx) {
+        // Sequenza di 3 beep da timer palestra (La5 -> La5 -> Re6 acuto finale)
+        const beeps = [
+          { delay: 0, duration: 0.18, freq: 880, peakGain: 0.38 },
+          { delay: 0.24, duration: 0.18, freq: 880, peakGain: 0.38 },
+          { delay: 0.48, duration: 0.42, freq: 1174.66, peakGain: 0.45 },
+        ];
+
+        const baseTime = ctx.currentTime + 0.01;
+        beeps.forEach(({ delay, duration, freq, peakGain }) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = "triangle";
+          osc.frequency.setValueAtTime(freq, baseTime + delay);
+
+          gain.gain.setValueAtTime(0.0001, baseTime + delay);
+          gain.gain.exponentialRampToValueAtTime(
+            peakGain,
+            baseTime + delay + 0.02
+          );
+          gain.gain.setValueAtTime(
+            peakGain,
+            baseTime + delay + duration - 0.04
+          );
+          gain.gain.exponentialRampToValueAtTime(
+            0.0001,
+            baseTime + delay + duration
+          );
+
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(baseTime + delay);
+          osc.stop(baseTime + delay + duration + 0.02);
+        });
+      }
+    } catch {
+      // Ignora se l'audio è bloccato dal dispositivo
+    }
+
+    try {
+      if (
+        typeof window !== "undefined" &&
+        "Notification" in window &&
+        Notification.permission === "granted"
+      ) {
+        new Notification("⏱ Recupero Terminato!", {
+          body: "Il tempo di recupero è scaduto: pronto per la prossima serie!",
+          silent: false,
+        });
+      }
+    } catch {
+      // Ignora se le notifiche di sistema non sono supportate su questo browser
+    }
+  };
+
+  // Screen Wake Lock API: impedisce lo standby dello schermo durante l'allenamento o il timer
   useEffect(() => {
-    if (restRemaining === null || restRemaining <= 0) return;
-    const timerId = window.setInterval(() => {
-      setRestRemaining((prev) => {
-        if (prev === null || prev <= 1) {
-          return 0;
+    const shouldKeepAwake =
+      mode === "training" || (restRemaining !== null && restRemaining > 0);
+    if (!shouldKeepAwake) {
+      setWakeLockActive(false);
+      return;
+    }
+
+    let wakeLockSentinel: { release: () => Promise<void> } | null = null;
+    let isMounted = true;
+
+    const requestWakeLock = async () => {
+      try {
+        const nav = navigator as unknown as {
+          wakeLock?: {
+            request: (
+              type: "screen"
+            ) => Promise<{ release: () => Promise<void> }>;
+          };
+        };
+        if (nav.wakeLock && document.visibilityState === "visible") {
+          wakeLockSentinel = await nav.wakeLock.request("screen");
+          if (isMounted) setWakeLockActive(true);
         }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => window.clearInterval(timerId);
-  }, [restRemaining]);
+      } catch {
+        if (isMounted) setWakeLockActive(false);
+      }
+    };
+
+    requestWakeLock();
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        requestWakeLock();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      isMounted = false;
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      if (wakeLockSentinel) {
+        wakeLockSentinel.release().catch(() => {});
+      }
+    };
+  }, [mode, restRemaining]);
+
+  // Gestione Countdown Timer Recupero tramite Timestamp reale (funziona anche in background / standby)
+  useEffect(() => {
+    if (restEndTimeMs === null) return;
+
+    const syncCountdown = () => {
+      const diffMs = restEndTimeMs - Date.now();
+      if (diffMs <= 0) {
+        setRestRemaining(0);
+        setRestEndTimeMs(null);
+        notifyRestFinished();
+      } else {
+        setRestRemaining(Math.ceil(diffMs / 1000));
+      }
+    };
+
+    syncCountdown();
+
+    const timerId = window.setInterval(syncCountdown, 250);
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === "visible") {
+        syncCountdown();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+    window.addEventListener("focus", handleVisibilityOrFocus);
+
+    return () => {
+      window.clearInterval(timerId);
+      document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
+      window.removeEventListener("focus", handleVisibilityOrFocus);
+    };
+  }, [restEndTimeMs]);
 
   const handlePressRestTimer = () => {
     if (restRemaining !== null && restRemaining > 0) {
+      setRestEndTimeMs(null);
       setRestRemaining(null);
     } else {
+      // Sblocca AudioContext direttamente nel gesto utente (fondamentale per iOS Safari e Android Chrome)
+      try {
+        const ctx = getUnlockedAudioContext();
+        if (ctx) {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+          gain.gain.setValueAtTime(0.08, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.07);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.08);
+        }
+      } catch {
+        // Ignora
+      }
+
+      // Richiede eventuale permesso per le notifiche di sistema se non ancora concesso
+      try {
+        if (
+          typeof window !== "undefined" &&
+          "Notification" in window &&
+          Notification.permission === "default"
+        ) {
+          Notification.requestPermission().catch(() => {});
+        }
+      } catch {
+        // Ignora
+      }
+
+      const endMs = Date.now() + restDuration * 1000;
       setRestRemaining(restDuration);
+      setRestEndTimeMs(endMs);
     }
   };
 
@@ -436,6 +632,7 @@ export default function DailyWorkoutTracker({
       }
     );
 
+    setRestEndTimeMs(null);
     setRestRemaining(null);
     markSaved(`Avviato ${activeDay.name} (Serie azzerate a 0)`);
     setExercisePage(1);
@@ -800,6 +997,7 @@ export default function DailyWorkoutTracker({
                     type="button"
                     onClick={() => {
                       setRestDuration(sec);
+                      setRestEndTimeMs(null);
                       setRestRemaining(null);
                     }}
                     className={`rounded-xl py-2 text-xs font-extrabold transition ${
@@ -1016,6 +1214,7 @@ export default function DailyWorkoutTracker({
               </span>
 
               <span className="text-slate-400">
+                {wakeLockActive ? "📱 Schermo attivo • " : ""}
                 Esercizio {safeExercisePage} di {totalExercises} • Scorri ← →
               </span>
             </div>
